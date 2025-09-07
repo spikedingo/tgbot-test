@@ -2,6 +2,7 @@ require('dotenv').config({ path: '.env.local' });
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const {updateUserAuthStatus, getUserAuthStatus } = require('./mockDb');
+const { encryptPrivyAccessToken, decryptPrivyAccessToken, isValidEncryptedToken } = require('./cryptoUtils');
 
 
 const app = express();
@@ -200,11 +201,11 @@ app.get('/keep-alive', (req, res) => {
  * This endpoint is called by the web application when a user completes authentication
  * 
  * POST /auth/callback
- * Body: { telegramUserId: string, privyUserId: string, isAuthenticated: boolean }
+ * Body: { telegramUserId: string, privyUserId: string, isAuthenticated: boolean, privyAccessToken: string }
  */
 app.post('/auth/callback', async (req, res) => {
   try {
-    const { telegramUserId, privyUserId, isAuthenticated } = req.body;
+    const { telegramUserId, privyUserId, isAuthenticated, privyAccessToken } = req.body;
     
     console.log(`Received auth callback for user ${telegramUserId}: authenticated=${isAuthenticated}`);
     
@@ -212,8 +213,28 @@ app.post('/auth/callback', async (req, res) => {
       return res.status(400).json({ error: 'telegramUserId is required' });
     }
     
-    // Update user authentication status in our database
-    updateUserAuthStatus(telegramUserId, isAuthenticated, privyUserId);
+    let encryptedAccessToken = null;
+    
+    // Handle privyAccessToken if provided
+    if (privyAccessToken) {
+      try {
+        // Check if the token is already encrypted
+        if (isValidEncryptedToken(privyAccessToken)) {
+          console.log(`Access token for user ${telegramUserId} is already encrypted`);
+          encryptedAccessToken = privyAccessToken;
+        } else {
+          // Encrypt the access token
+          console.log(`Encrypting access token for user ${telegramUserId}`);
+          encryptedAccessToken = encryptPrivyAccessToken(privyAccessToken);
+        }
+      } catch (encryptionError) {
+        console.error(`Error handling access token for user ${telegramUserId}:`, encryptionError);
+        return res.status(400).json({ error: 'Failed to process access token' });
+      }
+    }
+    
+    // Update user authentication status in our database with encrypted token
+    updateUserAuthStatus(telegramUserId, isAuthenticated, privyUserId, encryptedAccessToken);
     
     if (isAuthenticated) {
       // Send confirmation message to the user
@@ -266,7 +287,7 @@ bot.onText(/\/login/, async (msg) => {
   try {
     // Create the login URL for Privy authentication
     // The URL should point to your web application with Privy configured
-    const loginUrl = `${process.env.WEB_APP_URL || 'https://192.168.0.104:3000'}/login?user_id=${userId}`;
+    const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
     
     // Send message with inline keyboard for login
     bot.sendMessage(
@@ -284,14 +305,6 @@ bot.onText(/\/login/, async (msg) => {
                 login_url: {
                   url: loginUrl,
                   forward_text: 'Login to Solana Trading Bot'
-                }
-              }
-            ],
-            [
-              {
-                text: '📱 Open as Mini App',
-                web_app: {
-                  url: loginUrl
                 }
               }
             ]

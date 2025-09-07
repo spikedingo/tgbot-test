@@ -14,6 +14,7 @@ const path = require('path');
  *     walletId: string,
  *     isAuthenticated: boolean,
  *     privyUserId: string,
+ *     privyAccessToken: string (encrypted),
  *     lastLogin: timestamp
  *   }
  * }
@@ -122,8 +123,9 @@ function saveUserWallet(userId, walletId) {
  * @param {string} userId - Telegram user ID
  * @param {boolean} isAuthenticated - Authentication status
  * @param {string} privyUserId - Privy user ID (optional)
+ * @param {string} encryptedAccessToken - Encrypted Privy access token (optional)
  */
-function updateUserAuthStatus(userId, isAuthenticated, privyUserId = null) {
+function updateUserAuthStatus(userId, isAuthenticated, privyUserId = null, encryptedAccessToken = null) {
   try {
     // Load existing user data
     const userData = getAllUserData();
@@ -141,10 +143,14 @@ function updateUserAuthStatus(userId, isAuthenticated, privyUserId = null) {
       userData[userId].privyUserId = privyUserId;
     }
     
+    if (encryptedAccessToken) {
+      userData[userId].privyAccessToken = encryptedAccessToken;
+    }
+    
     // Save the updated data
     saveAllUserData(userData);
     
-    console.log(`Updated auth status for user ${userId}: authenticated=${isAuthenticated}`);
+    console.log(`Updated auth status for user ${userId}: authenticated=${isAuthenticated}, hasAccessToken=${!!encryptedAccessToken}`);
   } catch (error) {
     console.error(`Error updating auth status for user ${userId}:`, error);
   }
@@ -165,12 +171,36 @@ function getUserAuthStatus(userId) {
   }
 }
 
+/**
+ * Retrieves and decrypts the Privy access token for a user
+ * @param {string} userId - Telegram user ID
+ * @returns {string|null} Decrypted access token or null if not found/error
+ */
+function getUserAccessToken(userId) {
+  try {
+    const userData = getUserAuthStatus(userId);
+    if (!userData || !userData.privyAccessToken) {
+      return null;
+    }
+    
+    // Import decryption function
+    const { decryptPrivyAccessToken } = require('./cryptoUtils');
+    
+    // Decrypt the access token
+    return decryptPrivyAccessToken(userData.privyAccessToken);
+  } catch (error) {
+    console.error(`Error getting access token for user ${userId}:`, error);
+    return null;
+  }
+}
+
 module.exports = {
   getAllUserWallets,
   saveAllUserWallets,
   saveUserWallet,
   updateUserAuthStatus,
   getUserAuthStatus,
+  getUserAccessToken,
   getAllUserData,
   saveAllUserData
 }; 
