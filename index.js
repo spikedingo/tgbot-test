@@ -7,10 +7,10 @@ const {updateUserAuthStatus, getUserAuthStatus } = require('./mockDb');
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Initialize Telegram bot (disable polling for serverless deployment)
+// Initialize Telegram bot with polling for Railway deployment
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { 
-  polling: false,
-  webHook: true 
+  polling: process.env.USE_POLLING === 'true' ? true : false,
+  webHook: process.env.USE_POLLING === 'true' ? false : true 
 });
 
 // Middleware to parse JSON
@@ -444,9 +444,28 @@ bot.on('message', async (msg) => {
 // Export the Express app for Vercel
 module.exports = app;
 
-// Only start server if not in serverless environment
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Server is running on port ${port} and accessible from network`);
+// Start server for Railway deployment
+const server = app.listen(port, '0.0.0.0', async () => {
+  console.log(`Server is running on port ${port} and accessible from network`);
+  
+  // If using polling, delete any existing webhook
+  if (process.env.USE_POLLING === 'true') {
+    try {
+      await bot.deleteWebHook();
+      console.log('Webhook deleted, bot now running in polling mode');
+    } catch (error) {
+      console.error('Error deleting webhook:', error);
+    }
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  if (process.env.USE_POLLING === 'true') {
+    bot.stopPolling();
+  }
+  server.close(() => {
+    console.log('Process terminated');
   });
-} 
+}); 

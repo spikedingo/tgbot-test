@@ -5,12 +5,15 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "dev": "node index.js",
     "build": "echo 'No build step required'",
     "test": "echo \"Error: no test specified\" && exit 1",
     "setup-webhook": "node setup-webhook.js",
     "webhook-info": "node setup-webhook.js info",
     "delete-webhook": "node setup-webhook.js delete",
-    "monitor-webhook": "node monitor-webhook.js"
+    "monitor-webhook": "node monitor-webhook.js",
+    "railway:deploy": "railway up",
+    "railway:logs": "railway logs"
   },
   "keywords": [
     "telegram",
