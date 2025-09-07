@@ -285,6 +285,45 @@ bot.onText(/\/login/, async (msg) => {
   console.log(`Processing /login command for user ${userId}`);
   
   try {
+    // Check if user is already authenticated
+    const userData = getUserAuthStatus(userId);
+    if (userData && userData.isAuthenticated) {
+      console.log(`User ${userId} is already authenticated`);
+      
+      // Display existing user credentials information
+      const lastLoginText = userData.lastLogin ? 
+        new Date(userData.lastLogin).toLocaleString() : 'Unknown';
+      
+      bot.sendMessage(
+        msg.chat.id,
+        '✅ **Already Logged In**\n\n' +
+        'You are already authenticated with Privy.\n\n' +
+        `🔑 **Privy User ID:** \`${userData.privyUserId || 'N/A'}\`\n` +
+        `📅 **Last Login:** ${lastLoginText}\n\n` +
+        'You can use all bot features. If you need to re-authenticate, use the button below.',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '🔄 Re-authenticate',
+                  callback_data: 'reauth_request'
+                }
+              ],
+              [
+                {
+                  text: '📊 Check Status',
+                  callback_data: 'check_status'
+                }
+              ]
+            ]
+          }
+        }
+      );
+      return;
+    }
+    
     // Create the login URL for Privy authentication
     // The URL should point to your web application with Privy configured
     const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
@@ -529,6 +568,67 @@ bot.on('callback_query', async (callbackQuery) => {
       
       await bot.answerCallbackQuery(callbackQuery.id, {
         text: '❌ Error redirecting to login. Please try /login command.',
+        show_alert: true
+      });
+    }
+  }
+  
+  // Handle check status request
+  if (data === 'check_status') {
+    try {
+      // Answer the callback query
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: 'Checking your status...',
+        show_alert: false
+      });
+      
+      // Get user authentication status
+      const userData = getUserAuthStatus(userId);
+      
+      if (!userData || !userData.isAuthenticated) {
+        bot.sendMessage(
+          callbackQuery.message.chat.id,
+          '❌ **Not Authenticated**\n\n' +
+          'You are not currently authenticated with Privy.\n\n' +
+          'Use /login to authenticate and access all bot features.',
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+      
+      // Format user status information
+      const lastLoginText = userData.lastLogin ? 
+        new Date(userData.lastLogin).toLocaleString() : 'Unknown';
+      const walletIdText = userData.walletId ? userData.walletId : 'Not linked';
+      
+      bot.sendMessage(
+        callbackQuery.message.chat.id,
+        '📊 **Your Status**\n\n' +
+        `✅ **Authentication:** Active\n` +
+        `🔑 **Privy User ID:** \`${userData.privyUserId || 'N/A'}\`\n` +
+        `👛 **Wallet ID:** \`${walletIdText}\`\n` +
+        `📅 **Last Login:** ${lastLoginText}\n\n` +
+        'All bot features are available to you.',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '🔑 Get Access Token',
+                  callback_data: 'get_access_token'
+                }
+              ]
+            ]
+          }
+        }
+      );
+      
+    } catch (error) {
+      console.error(`Error checking status for user ${userId}:`, error);
+      
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: '❌ Error checking status. Please try again.',
         show_alert: true
       });
     }
