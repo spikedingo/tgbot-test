@@ -12,6 +12,13 @@
   resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.28.3.tgz#75c5034b55ba868121668be5d5bb31cc64e6e61a"
   integrity sha512-9uIQ10o0WGdpP6GDhXcdOJPJuDgFtIDtN/9+ArJQ2NAfAmiuhTQdzkaTGR33v43GYS2UrSA0eX2pPPHoFVvpxA==
 
+"@crestal/nation-sdk@^0.6.26":
+  version "0.6.26"
+  resolved "https://registry.yarnpkg.com/@crestal/nation-sdk/-/nation-sdk-0.6.26.tgz#fffd28539afdf2645299d2f6bb5d5c79f541755a"
+  integrity sha512-WqBYxI5vKidMGpnsJ5UX464qSqfCtnlVvjv3XuwBvkABCTAtRQA0uEhs1WCHIqO2Vj0UxlZ0KgsGT31js8mRsg==
+  dependencies:
+    axios "^1.6.1"
+
 "@hpke/chacha20poly1305@^1.6.2":
   version "1.7.1"
   resolved "https://registry.yarnpkg.com/@hpke/chacha20poly1305/-/chacha20poly1305-1.7.1.tgz#645160fc32b377969bf01e9de8108eeb1ceef73e"
@@ -364,7 +371,7 @@ aws4@^1.8.0:
   resolved "https://registry.yarnpkg.com/aws4/-/aws4-1.13.2.tgz#0aa167216965ac9474ccfa83892cfb6b3e1e52ef"
   integrity sha512-lHe62zvbTB5eEABUVi/AwVh0ZKY9rMMDhmm+eeyuuUQbQ3+J+fONVQOZyj+DdrvD4BY33uYniyRJ4UJIaSKAfw==
 
-axios@^1.8.4:
+axios@^1.6.1, axios@^1.8.4:
   version "1.11.0"
   resolved "https://registry.yarnpkg.com/axios/-/axios-1.11.0.tgz#c2ec219e35e414c025b2095e8b8280278478fdb6"
   integrity sha512-1Lx3WLFQWm3ooKDYZD1eXmoGO9fxYQjrycfHFC8P0sCfQVXyROp0p9PFWBehewBOdCwHc+f/b8I0fMto5eSfwA==

@@ -3,6 +3,7 @@ const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const {updateUserAuthStatus, getUserAuthStatus, getUserAccessToken } = require('./mockDb');
 const { encryptPrivyAccessToken, decryptPrivyAccessToken, isValidEncryptedToken } = require('./cryptoUtils');
+const { getUserAccount } = require('./api/nation');
 
 
 const app = express();
@@ -366,7 +367,8 @@ bot.onText(/\/login/, async (msg) => {
  * Handles the /status command to check user authentication status
  * This command:
  * 1. Retrieves the user's authentication status
- * 2. Displays wallet and authentication information
+ * 2. Calls getUserAccount API to get account information
+ * 3. Displays wallet and authentication information
  * 
  * @param {Object} msg - Telegram message object
  */
@@ -378,24 +380,84 @@ bot.onText(/\/status/, async (msg) => {
     // Get user data from our database
     const userData = getUserAuthStatus(userId);
 
-    // Format status message
-    const authStatus = userData.isAuthenticated ? '✅ Authenticated' : '❌ Not authenticated';
+    if (!userData || !userData.isAuthenticated) {
+      bot.sendMessage(
+        msg.chat.id,
+        `📊 **Account Status**\n\n` +
+        `Authentication: ❌ Not authenticated\n\n` +
+        `Use /login to authenticate with Privy first to access account information.`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+
+    // Get access token and call getUserAccount API
+    const accessToken = getUserAccessToken(userId);
+    
+    if (!accessToken) {
+      bot.sendMessage(
+        msg.chat.id,
+        `📊 **Account Status**\n\n` +
+        `Authentication: ❌ Access token not found\n\n` +
+        `Please re-authenticate using /login to get your account information.`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+
+    // Call getUserAccount API
+    const accountData = await getUserAccount(accessToken);
+    
+    // Format status message with API data
+    const authStatus = '✅ Authenticated';
     const privyUserId = userData.privyUserId ? `\nPrivy User ID: ${userData.privyUserId}` : '';
     const lastLogin = userData.lastLogin ? `\nLast login: ${new Date(userData.lastLogin).toLocaleString()}` : '';
+    
+    // Format account information from API
+    let accountInfo = '\n\n🏦 **Account Information:**\n';
+    if (accountData) {
+      if (accountData.id) accountInfo += `Account ID: \`${accountData.id}\`\n`;
+      if (accountData.credits !== undefined) accountInfo += `Credits: ${accountData.credits}\n`;
+      if (accountData.email) accountInfo += `Email: ${accountData.email}\n`;
+      if (accountData.username) accountInfo += `Username: ${accountData.username}\n`;
+      if (accountData.created_at) accountInfo += `Created: ${new Date(accountData.created_at).toLocaleString()}\n`;
+      
+      // Add any other relevant fields from the API response
+      if (Object.keys(accountData).length > 0) {
+        accountInfo += `\n📋 **Full API Response:**\n\`\`\`json\n${JSON.stringify(accountData, null, 2)}\n\`\`\``;
+      }
+    } else {
+      accountInfo += 'No account data available';
+    }
     
     bot.sendMessage(
       msg.chat.id,
       `📊 **Account Status**\n\n` +
-      `Authentication: ${authStatus}${privyUserId}${lastLogin}\n\n` +
-      `Use /login to authenticate with Privy if you haven't already.`,
+      `Authentication: ${authStatus}${privyUserId}${lastLogin}${accountInfo}`,
       { parse_mode: 'Markdown' }
     );
     
   } catch (error) {
     console.error(`Error fetching status for user ${userId}:`, error);
+    
+    let errorMessage = '❌ Sorry, there was an error fetching your account information.';
+    
+    // Provide more specific error messages based on the error type
+    if (error.response) {
+      if (error.response.status === 401) {
+        errorMessage = '❌ Authentication failed. Please re-authenticate using /login.';
+      } else if (error.response.status === 403) {
+        errorMessage = '❌ Access forbidden. Please check your permissions.';
+      } else {
+        errorMessage = `❌ API Error (${error.response.status}): ${error.response.data?.message || 'Unknown error'}`;
+      }
+    } else if (error.message) {
+      errorMessage = `❌ Error: ${error.message}`;
+    }
+    
     bot.sendMessage(
       msg.chat.id,
-      '❌ Sorry, there was an error fetching your status. Please try again later.'
+      errorMessage + '\n\nIf this error persists, please contact support.'
     );
   }
 });

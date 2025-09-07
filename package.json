@@ -25,6 +25,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@crestal/nation-sdk": "^0.6.26",
     "@jup-ag/api": "^6.0.40",
     "@privy-io/server-auth": "^1.20.2",
     "@solana/web3.js": "^1.87.6",
