@@ -41,24 +41,6 @@ function getAllUserData() {
 }
 
 /**
- * Retrieves all user-wallet relationships from the mock database (backward compatibility)
- * @returns {Object} Map of Telegram user IDs to Privy wallet IDs
- */
-function getAllUserWallets() {
-  const userData = getAllUserData();
-  const walletMappings = {};
-  
-  // Convert new format to old format for backward compatibility
-  for (const [userId, data] of Object.entries(userData)) {
-    if (data.walletId) {
-      walletMappings[userId] = data.walletId;
-    }
-  }
-  
-  return walletMappings;
-}
-
-/**
  * Saves all user data to the mock database
  * @param {Object} userData - Map of Telegram user IDs to user data objects
  */
@@ -67,54 +49,6 @@ function saveAllUserData(userData) {
     fs.writeFileSync(userDataPath, JSON.stringify(userData, null, 2));
   } catch (error) {
     console.error('Error saving user data:', error);
-  }
-}
-
-/**
- * Saves all user-wallet relationships to the mock database (backward compatibility)
- * @param {Object} userWallets - Map of Telegram user IDs to Privy wallet IDs
- */
-function saveAllUserWallets(userWallets) {
-  try {
-    const userData = getAllUserData();
-    
-    // Update wallet IDs while preserving other user data
-    for (const [userId, walletId] of Object.entries(userWallets)) {
-      if (!userData[userId]) {
-        userData[userId] = {};
-      }
-      userData[userId].walletId = walletId;
-    }
-    
-    saveAllUserData(userData);
-  } catch (error) {
-    console.error('Error saving user-wallet mappings:', error);
-  }
-}
-
-/**
- * Saves a single user-wallet relationship to the mock database
- * This is more efficient than loading and saving the entire mapping when only updating one user
- * @param {string} userId - Telegram user ID
- * @param {string} walletId - Privy wallet ID
- */
-function saveUserWallet(userId, walletId) {
-  try {
-    // Load existing user data
-    const userData = getAllUserData();
-    
-    // Initialize user data if it doesn't exist
-    if (!userData[userId]) {
-      userData[userId] = {};
-    }
-    
-    // Update the specific user's wallet
-    userData[userId].walletId = walletId;
-    
-    // Save the updated data
-    saveAllUserData(userData);
-  } catch (error) {
-    console.error(`Error saving wallet for user ${userId}:`, error);
   }
 }
 
@@ -194,13 +128,37 @@ function getUserAccessToken(userId) {
   }
 }
 
+/**
+ * Clears user authentication data (token and authentication status)
+ * This is used when tokens expire or authentication fails
+ * @param {string} userId - Telegram user ID
+ */
+function clearUserAuthData(userId) {
+  try {
+    // Load existing user data
+    const userData = getAllUserData();
+    
+    if (userData[userId]) {
+      // Clear authentication-related data but keep other user data
+      userData[userId].isAuthenticated = false;
+      userData[userId].privyAccessToken = null;
+      // Keep privyUserId and lastLogin for reference
+      
+      // Save the updated data
+      saveAllUserData(userData);
+      
+      console.log(`Cleared authentication data for user ${userId} due to token expiration or API failure`);
+    }
+  } catch (error) {
+    console.error(`Error clearing auth data for user ${userId}:`, error);
+  }
+}
+
 module.exports = {
-  getAllUserWallets,
-  saveAllUserWallets,
-  saveUserWallet,
   updateUserAuthStatus,
   getUserAuthStatus,
   getUserAccessToken,
+  clearUserAuthData,
   getAllUserData,
   saveAllUserData
 }; 

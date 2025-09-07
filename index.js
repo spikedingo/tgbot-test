@@ -1,7 +1,7 @@
 require('dotenv').config({ path: '.env.local' });
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
-const {updateUserAuthStatus, getUserAuthStatus, getUserAccessToken } = require('./mockDb');
+const {updateUserAuthStatus, getUserAuthStatus, getUserAccessToken, clearUserAuthData } = require('./mockDb');
 const { encryptPrivyAccessToken, decryptPrivyAccessToken, isValidEncryptedToken } = require('./cryptoUtils');
 const { getUserAccount } = require('./api/nation');
 
@@ -273,6 +273,35 @@ app.post('/auth/callback', async (req, res) => {
  */
 
 /**
+ * Helper function to check if a user is properly authenticated
+ * This checks both the authentication flag and the presence of a valid access token
+ * @param {string} userId - Telegram user ID
+ * @returns {Object} { isAuthenticated: boolean, userData: Object|null, hasValidToken: boolean }
+ */
+function checkUserAuthentication(userId) {
+  try {
+    const userData = getUserAuthStatus(userId);
+    
+    if (!userData || !userData.isAuthenticated) {
+      return { isAuthenticated: false, userData: null, hasValidToken: false };
+    }
+    
+    // Check if user has a valid access token
+    const accessToken = getUserAccessToken(userId);
+    const hasValidToken = !!accessToken;
+    
+    return { 
+      isAuthenticated: userData.isAuthenticated, 
+      userData: userData, 
+      hasValidToken: hasValidToken 
+    };
+  } catch (error) {
+    console.error(`Error checking authentication for user ${userId}:`, error);
+    return { isAuthenticated: false, userData: null, hasValidToken: false };
+  }
+}
+
+/**
  * Handles the /login command to authenticate users with Privy
  * This command:
  * 1. Creates a login URL with Privy authentication
@@ -286,20 +315,24 @@ bot.onText(/\/login/, async (msg) => {
   console.log(`Processing /login command for user ${userId}`);
   
   try {
+    // Create the login URL for Privy authentication
+    // The URL should point to your web application with Privy configured
+    const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
+    
     // Check if user is already authenticated
-    const userData = getUserAuthStatus(userId);
-    if (userData && userData.isAuthenticated) {
-      console.log(`User ${userId} is already authenticated`);
+    const authCheck = checkUserAuthentication(userId);
+    if (authCheck.isAuthenticated && authCheck.hasValidToken) {
+      console.log(`User ${userId} is already authenticated with valid token`);
       
       // Display existing user credentials information
-      const lastLoginText = userData.lastLogin ? 
-        new Date(userData.lastLogin).toLocaleString() : 'Unknown';
+      const lastLoginText = authCheck.userData.lastLogin ? 
+        new Date(authCheck.userData.lastLogin).toLocaleString() : 'Unknown';
       
       bot.sendMessage(
         msg.chat.id,
         '✅ **Already Logged In**\n\n' +
         'You are already authenticated with Privy.\n\n' +
-        `🔑 **Privy User ID:** \`${userData.privyUserId || 'N/A'}\`\n` +
+        `🔑 **Privy User ID:** \`${authCheck.userData.privyUserId || 'N/A'}\`\n` +
         `📅 **Last Login:** ${lastLoginText}\n\n` +
         'You can use all bot features. If you need to re-authenticate, use the button below.',
         {
@@ -326,11 +359,11 @@ bot.onText(/\/login/, async (msg) => {
         }
       );
       return;
+    } else if (authCheck.isAuthenticated && !authCheck.hasValidToken) {
+      console.log(`User ${userId} is marked as authenticated but has no valid token - clearing auth data`);
+      // Clear authentication data if user is marked as authenticated but has no valid token
+      clearUserAuthData(userId);
     }
-    
-    // Create the login URL for Privy authentication
-    // The URL should point to your web application with Privy configured
-    const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
     
     // Send message with inline keyboard for login
     bot.sendMessage(
@@ -380,15 +413,25 @@ bot.onText(/\/status/, async (msg) => {
   console.log(`Processing /status command for user ${userId}`);
   
   try {
-    // Get user data from our database
-    const userData = getUserAuthStatus(userId);
+    // Check user authentication status
+    const authCheck = checkUserAuthentication(userId);
 
-    if (!userData || !userData.isAuthenticated) {
+    if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+      let statusMessage = `📊 **Account Status**\n\n`;
+      
+      if (!authCheck.isAuthenticated) {
+        statusMessage += `Authentication: ❌ Not authenticated\n\n`;
+        statusMessage += `Use /login to authenticate with Privy first to access account information.`;
+      } else if (!authCheck.hasValidToken) {
+        statusMessage += `Authentication: ❌ Access token not found or expired\n\n`;
+        statusMessage += `Please re-authenticate using /login to get your account information.`;
+        // Clear the invalid authentication data
+        clearUserAuthData(userId);
+      }
+      
       bot.sendMessage(
         msg.chat.id,
-        `📊 **Account Status**\n\n` +
-        `Authentication: ❌ Not authenticated\n\n` +
-        `Use /login to authenticate with Privy first to access account information.`,
+        statusMessage,
         { parse_mode: 'Markdown' }
       );
       return;
@@ -396,25 +439,14 @@ bot.onText(/\/status/, async (msg) => {
 
     // Get access token and call getUserAccount API
     const accessToken = getUserAccessToken(userId);
-    
-    if (!accessToken) {
-      bot.sendMessage(
-        msg.chat.id,
-        `📊 **Account Status**\n\n` +
-        `Authentication: ❌ Access token not found\n\n` +
-        `Please re-authenticate using /login to get your account information.`,
-        { parse_mode: 'Markdown' }
-      );
-      return;
-    }
 
     // Call getUserAccount API
     const accountData = await getUserAccount(accessToken);
     
     // Format status message with API data
     const authStatus = '✅ Authenticated';
-    const privyUserId = userData.privyUserId ? `\nPrivy User ID: ${userData.privyUserId}` : '';
-    const lastLogin = userData.lastLogin ? `\nLast login: ${new Date(userData.lastLogin).toLocaleString()}` : '';
+    const privyUserId = authCheck.userData.privyUserId ? `\nPrivy User ID: ${authCheck.userData.privyUserId}` : '';
+    const lastLogin = authCheck.userData.lastLogin ? `\nLast login: ${new Date(authCheck.userData.lastLogin).toLocaleString()}` : '';
     
     // Format account information from API
     let accountInfo = '\n\n🏦 **Account Information:**\n';
@@ -444,11 +476,13 @@ bot.onText(/\/status/, async (msg) => {
     console.error(`Error fetching status for user ${userId}:`, error);
     
     let errorMessage = '❌ Sorry, there was an error fetching your account information.';
+    let shouldClearAuth = false;
     
     // Provide more specific error messages based on the error type
     if (error.response) {
       if (error.response.status === 401) {
-        errorMessage = '❌ Authentication failed. Please re-authenticate using /login.';
+        errorMessage = '❌ Authentication failed. Your token may have expired. Please re-authenticate using /login.';
+        shouldClearAuth = true; // Clear auth data for 401 errors (expired tokens)
       } else if (error.response.status === 403) {
         errorMessage = '❌ Access forbidden. Please check your permissions.';
       } else {
@@ -456,6 +490,12 @@ bot.onText(/\/status/, async (msg) => {
       }
     } else if (error.message) {
       errorMessage = `❌ Error: ${error.message}`;
+    }
+    
+    // Clear user authentication data if token appears to be expired
+    if (shouldClearAuth) {
+      clearUserAuthData(userId);
+      console.log(`Cleared authentication data for user ${userId} due to API failure`);
     }
     
     bot.sendMessage(
@@ -492,23 +532,25 @@ bot.onText(/\/accessToken/, async (msg) => {
   
   try {
     // Check if user is authenticated
-    const userData = getUserAuthStatus(userId);
-    if (!userData || !userData.isAuthenticated) {
-      return bot.sendMessage(
-        msg.chat.id,
-        '❌ You are not authenticated. Please use /login to authenticate with Privy first.'
-      );
+    const authCheck = checkUserAuthentication(userId);
+    if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+      if (!authCheck.isAuthenticated) {
+        return bot.sendMessage(
+          msg.chat.id,
+          '❌ You are not authenticated. Please use /login to authenticate with Privy first.'
+        );
+      } else {
+        // Clear invalid auth data and ask for re-authentication
+        clearUserAuthData(userId);
+        return bot.sendMessage(
+          msg.chat.id,
+          '❌ No valid access token found. Please re-authenticate using /login.'
+        );
+      }
     }
     
     // Get and decrypt the access token
     const accessToken = getUserAccessToken(userId);
-    
-    if (!accessToken) {
-      return bot.sendMessage(
-        msg.chat.id,
-        '❌ No access token found. Please re-authenticate using /login.'
-      );
-    }
     
     // Send the access token to the user
     bot.sendMessage(
@@ -648,29 +690,39 @@ bot.on('callback_query', async (callbackQuery) => {
       });
       
       // Get user authentication status
-      const userData = getUserAuthStatus(userId);
+      const authCheck = checkUserAuthentication(userId);
       
-      if (!userData || !userData.isAuthenticated) {
+      if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+        let message = '❌ **Not Authenticated**\n\n';
+        
+        if (!authCheck.isAuthenticated) {
+          message += 'You are not currently authenticated with Privy.\n\n';
+        } else {
+          message += 'Your authentication token is invalid or expired.\n\n';
+          // Clear invalid auth data
+          clearUserAuthData(userId);
+        }
+        
+        message += 'Use /login to authenticate and access all bot features.';
+        
         bot.sendMessage(
           callbackQuery.message.chat.id,
-          '❌ **Not Authenticated**\n\n' +
-          'You are not currently authenticated with Privy.\n\n' +
-          'Use /login to authenticate and access all bot features.',
+          message,
           { parse_mode: 'Markdown' }
         );
         return;
       }
       
       // Format user status information
-      const lastLoginText = userData.lastLogin ? 
-        new Date(userData.lastLogin).toLocaleString() : 'Unknown';
-      const walletIdText = userData.walletId ? userData.walletId : 'Not linked';
+      const lastLoginText = authCheck.userData.lastLogin ? 
+        new Date(authCheck.userData.lastLogin).toLocaleString() : 'Unknown';
+      const walletIdText = authCheck.userData.walletId ? authCheck.userData.walletId : 'Not linked';
       
       bot.sendMessage(
         callbackQuery.message.chat.id,
         '📊 **Your Status**\n\n' +
         `✅ **Authentication:** Active\n` +
-        `🔑 **Privy User ID:** \`${userData.privyUserId || 'N/A'}\`\n` +
+        `🔑 **Privy User ID:** \`${authCheck.userData.privyUserId || 'N/A'}\`\n` +
         `👛 **Wallet ID:** \`${walletIdText}\`\n` +
         `📅 **Last Login:** ${lastLoginText}\n\n` +
         'All bot features are available to you.',
