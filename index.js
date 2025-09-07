@@ -1,7 +1,7 @@
 require('dotenv').config({ path: '.env.local' });
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
-const {updateUserAuthStatus, getUserAuthStatus } = require('./mockDb');
+const {updateUserAuthStatus, getUserAuthStatus, getUserAccessToken } = require('./mockDb');
 const { encryptPrivyAccessToken, decryptPrivyAccessToken, isValidEncryptedToken } = require('./cryptoUtils');
 
 
@@ -374,6 +374,75 @@ bot.onText(/\/status/, async (msg) => {
 });
 
 /**
+ * Handles the /accessToken command to retrieve and display user's Privy access token
+ * This command:
+ * 1. Retrieves the user's encrypted access token from database
+ * 2. Decrypts the access token
+ * 3. Sends the decrypted token to the user
+ * 
+ * @param {Object} msg - Telegram message object
+ */
+bot.onText(/\/accessToken/, async (msg) => {
+  const userId = msg.from.id;
+  console.log(`Processing /accessToken command for user ${userId}`);
+  
+  try {
+    // Check if user is authenticated
+    const userData = getUserAuthStatus(userId);
+    if (!userData || !userData.isAuthenticated) {
+      return bot.sendMessage(
+        msg.chat.id,
+        '❌ You are not authenticated. Please use /login to authenticate with Privy first.'
+      );
+    }
+    
+    // Get and decrypt the access token
+    const accessToken = getUserAccessToken(userId);
+    
+    if (!accessToken) {
+      return bot.sendMessage(
+        msg.chat.id,
+        '❌ No access token found. Please re-authenticate using /login.'
+      );
+    }
+    
+    // Send the access token to the user
+    bot.sendMessage(
+      msg.chat.id,
+      `🔑 **Your Privy Access Token**\n\n` +
+      `\`\`\`\n${accessToken}\n\`\`\`\n\n` +
+      `⚠️ **Security Notice:**\n` +
+      `• Keep this token secure and do not share it\n` +
+      `• This token provides access to your Privy account\n` +
+      `• If compromised, please re-authenticate immediately`,
+      { 
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🔄 Re-authenticate',
+                callback_data: 'reauth_request'
+              }
+            ]
+          ]
+        }
+      }
+    );
+    
+    console.log(`Access token sent to user ${userId}`);
+    
+  } catch (error) {
+    console.error(`Error retrieving access token for user ${userId}:`, error);
+    bot.sendMessage(
+      msg.chat.id,
+      '❌ Sorry, there was an error retrieving your access token. Please try again later.\n\n' +
+      'If this error persists, please contact support.'
+    );
+  }
+});
+
+/**
  * Handles login callback from Telegram
  * This is called when a user completes the login process via the login_url
  * 
@@ -414,6 +483,52 @@ bot.on('callback_query', async (callbackQuery) => {
       
       await bot.answerCallbackQuery(callbackQuery.id, {
         text: '❌ Login failed. Please try again.',
+        show_alert: true
+      });
+    }
+  }
+  
+  // Handle re-authentication request
+  if (data === 'reauth_request') {
+    try {
+      // Answer the callback query
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: 'Redirecting to login...',
+        show_alert: false
+      });
+      
+      // Create the login URL for Privy authentication
+      const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
+      
+      // Send message with inline keyboard for re-authentication
+      bot.sendMessage(
+        callbackQuery.message.chat.id,
+        '🔄 **Re-authentication Required**\n\n' +
+        'Click the button below to re-authenticate with Privy and update your access token.\n\n' +
+        'This will securely refresh your authentication and access token.',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '🔑 Re-authenticate with Privy',
+                  login_url: {
+                    url: loginUrl,
+                    forward_text: 'Re-authenticate to Solana Trading Bot'
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      );
+      
+    } catch (error) {
+      console.error(`Error handling re-auth request for user ${userId}:`, error);
+      
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: '❌ Error redirecting to login. Please try /login command.',
         show_alert: true
       });
     }
