@@ -309,7 +309,10 @@ bot.onText(/\/login/, async (msg) => {
               [
                 {
                   text: '🔄 Re-authenticate',
-                  callback_data: 'reauth_request'
+                  login_url: {
+                    url: loginUrl,
+                    forward_text: 'Re-authenticate to IntentKit'
+                  }
                 }
               ],
               [
@@ -344,7 +347,7 @@ bot.onText(/\/login/, async (msg) => {
                 text: '🔑 Login with Privy',
                 login_url: {
                   url: loginUrl,
-                  forward_text: 'Login to Solana Trading Bot'
+                  forward_text: 'Login to IntentKit'
                 }
               }
             ]
@@ -457,7 +460,19 @@ bot.onText(/\/status/, async (msg) => {
     
     bot.sendMessage(
       msg.chat.id,
-      errorMessage + '\n\nIf this error persists, please contact support.'
+      errorMessage + '\n\nIf this error persists, please contact support.',
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🔄 Re-authenticate',
+                callback_data: 'reauth_request'
+              }
+            ]
+          ]
+        }
+      }
     );
   }
 });
