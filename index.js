@@ -377,18 +377,7 @@ bot.onText(/\/status/, async (msg) => {
   try {
     // Get user data from our database
     const userData = getUserAuthStatus(userId);
-    console.log(userData, 'check user data')
-    if (!userData || !userData.walletId) {
-      return bot.sendMessage(
-        msg.chat.id,
-        '❌ You don\'t have a wallet yet. Use /start to create one.'
-      );
-    }
-    
-    // Get wallet information
-    const wallet = await privy.walletApi.getWallet({id: userData.walletId});
-    const walletAddress = wallet.address;
-    
+
     // Format status message
     const authStatus = userData.isAuthenticated ? '✅ Authenticated' : '❌ Not authenticated';
     const privyUserId = userData.privyUserId ? `\nPrivy User ID: ${userData.privyUserId}` : '';
@@ -397,7 +386,6 @@ bot.onText(/\/status/, async (msg) => {
     bot.sendMessage(
       msg.chat.id,
       `📊 **Account Status**\n\n` +
-      `Wallet Address: \`${walletAddress}\`\n` +
       `Authentication: ${authStatus}${privyUserId}${lastLogin}\n\n` +
       `Use /login to authenticate with Privy if you haven't already.`,
       { parse_mode: 'Markdown' }
