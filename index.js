@@ -349,6 +349,13 @@ bot.onText(/\/login/, async (msg) => {
                   url: loginUrl,
                   forward_text: 'Login to IntentKit'
                 }
+              },
+              {
+                text: '🌐 Login with Web App',
+                web_app: {
+                  url: loginUrl,
+                  forward_text: 'Login to IntentKit'
+                }
               }
             ]
           ]
