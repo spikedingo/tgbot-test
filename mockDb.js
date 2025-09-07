@@ -7,37 +7,85 @@ const path = require('path');
  * This starter repo uses a simple JSON file to mock a database for simplicity.
  * In a production environment, you should replace this with a proper database or other user management system.
  * 
- * This mock database stores the relationship between Telegram users and their Privy wallets.
- * The data structure is: { telegramUserId: privyWalletId }
+ * This mock database stores user data including wallet mappings and authentication status.
+ * The data structure is: 
+ * { 
+ *   telegramUserId: {
+ *     walletId: string,
+ *     isAuthenticated: boolean,
+ *     privyUserId: string,
+ *     lastLogin: timestamp
+ *   }
+ * }
  * This is a simple implementation for demonstration purposes only.
  */
 
-// Define the path for the wallet mapping file
-const walletMappingPath = path.join(__dirname, 'wallet-mappings.json');
+// Define the path for the user data file
+const userDataPath = path.join(__dirname, 'wallet-mappings.json');
 
 /**
- * Retrieves all user-wallet relationships from the mock database
- * @returns {Object} Map of Telegram user IDs to Privy wallet IDs
+ * Retrieves all user data from the mock database
+ * @returns {Object} Map of Telegram user IDs to user data objects
  */
-function getAllUserWallets() {
+function getAllUserData() {
   try {
-    if (fs.existsSync(walletMappingPath)) {
-      const data = fs.readFileSync(walletMappingPath, 'utf8');
+    if (fs.existsSync(userDataPath)) {
+      const data = fs.readFileSync(userDataPath, 'utf8');
       return JSON.parse(data);
     }
   } catch (error) {
-    console.error('Error reading user-wallet mappings:', error);
+    console.error('Error reading user data:', error);
   }
   return {};
 }
 
 /**
- * Saves all user-wallet relationships to the mock database
+ * Retrieves all user-wallet relationships from the mock database (backward compatibility)
+ * @returns {Object} Map of Telegram user IDs to Privy wallet IDs
+ */
+function getAllUserWallets() {
+  const userData = getAllUserData();
+  const walletMappings = {};
+  
+  // Convert new format to old format for backward compatibility
+  for (const [userId, data] of Object.entries(userData)) {
+    if (data.walletId) {
+      walletMappings[userId] = data.walletId;
+    }
+  }
+  
+  return walletMappings;
+}
+
+/**
+ * Saves all user data to the mock database
+ * @param {Object} userData - Map of Telegram user IDs to user data objects
+ */
+function saveAllUserData(userData) {
+  try {
+    fs.writeFileSync(userDataPath, JSON.stringify(userData, null, 2));
+  } catch (error) {
+    console.error('Error saving user data:', error);
+  }
+}
+
+/**
+ * Saves all user-wallet relationships to the mock database (backward compatibility)
  * @param {Object} userWallets - Map of Telegram user IDs to Privy wallet IDs
  */
 function saveAllUserWallets(userWallets) {
   try {
-    fs.writeFileSync(walletMappingPath, JSON.stringify(userWallets, null, 2));
+    const userData = getAllUserData();
+    
+    // Update wallet IDs while preserving other user data
+    for (const [userId, walletId] of Object.entries(userWallets)) {
+      if (!userData[userId]) {
+        userData[userId] = {};
+      }
+      userData[userId].walletId = walletId;
+    }
+    
+    saveAllUserData(userData);
   } catch (error) {
     console.error('Error saving user-wallet mappings:', error);
   }
@@ -51,21 +99,78 @@ function saveAllUserWallets(userWallets) {
  */
 function saveUserWallet(userId, walletId) {
   try {
-    // Load existing mappings
-    const userWallets = getAllUserWallets();
+    // Load existing user data
+    const userData = getAllUserData();
+    
+    // Initialize user data if it doesn't exist
+    if (!userData[userId]) {
+      userData[userId] = {};
+    }
     
     // Update the specific user's wallet
-    userWallets[userId] = walletId;
+    userData[userId].walletId = walletId;
     
-    // Save the updated mappings
-    saveAllUserWallets(userWallets);
+    // Save the updated data
+    saveAllUserData(userData);
   } catch (error) {
     console.error(`Error saving wallet for user ${userId}:`, error);
+  }
+}
+
+/**
+ * Updates user authentication status in the mock database
+ * @param {string} userId - Telegram user ID
+ * @param {boolean} isAuthenticated - Authentication status
+ * @param {string} privyUserId - Privy user ID (optional)
+ */
+function updateUserAuthStatus(userId, isAuthenticated, privyUserId = null) {
+  try {
+    // Load existing user data
+    const userData = getAllUserData();
+    
+    // Initialize user data if it doesn't exist
+    if (!userData[userId]) {
+      userData[userId] = {};
+    }
+    
+    // Update authentication status
+    userData[userId].isAuthenticated = isAuthenticated;
+    userData[userId].lastLogin = new Date().toISOString();
+    
+    if (privyUserId) {
+      userData[userId].privyUserId = privyUserId;
+    }
+    
+    // Save the updated data
+    saveAllUserData(userData);
+    
+    console.log(`Updated auth status for user ${userId}: authenticated=${isAuthenticated}`);
+  } catch (error) {
+    console.error(`Error updating auth status for user ${userId}:`, error);
+  }
+}
+
+/**
+ * Retrieves user authentication status from the mock database
+ * @param {string} userId - Telegram user ID
+ * @returns {Object|null} User data object or null if not found
+ */
+function getUserAuthStatus(userId) {
+  try {
+    const userData = getAllUserData();
+    return userData[userId] || null;
+  } catch (error) {
+    console.error(`Error getting auth status for user ${userId}:`, error);
+    return null;
   }
 }
 
 module.exports = {
   getAllUserWallets,
   saveAllUserWallets,
-  saveUserWallet
+  saveUserWallet,
+  updateUserAuthStatus,
+  getUserAuthStatus,
+  getAllUserData,
+  saveAllUserData
 }; 
