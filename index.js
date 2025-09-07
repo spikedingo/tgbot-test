@@ -9,8 +9,14 @@ const port = process.env.PORT || 3001;
 
 // Initialize Telegram bot with polling for Railway deployment
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { 
-  polling: process.env.USE_POLLING === 'true' ? true : false,
-  webHook: process.env.USE_POLLING === 'true' ? false : true 
+  polling: {
+    interval: 300, // Check for new messages every 300ms
+    autoStart: true, // Start polling automatically
+    params: {
+      timeout: 10, // Long polling timeout in seconds
+    }
+  },
+  webHook: false // Disable webhook
 });
 
 // Middleware to parse JSON
