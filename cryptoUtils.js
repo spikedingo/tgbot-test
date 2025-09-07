@@ -6,7 +6,7 @@ const crypto = require('crypto');
  */
 
 // Get encryption key from environment variables
-const ENCRYPTION_KEY = 'intentkit_secret';
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'intentkit_secret_default_key_32_bytes';
 const ALGORITHM = 'aes-256-gcm';
 
 /**
@@ -19,8 +19,11 @@ function encrypt(text) {
     // Generate a random initialization vector
     const iv = crypto.randomBytes(16);
     
-    // Create cipher
-    const cipher = crypto.createCipher(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'hex'));
+    // Create a 32-byte key from the encryption key
+    const key = crypto.createHash('sha256').update(ENCRYPTION_KEY).digest();
+    
+    // Create cipher with proper GCM mode
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
     
     // Encrypt the text
     let encrypted = cipher.update(text, 'utf8', 'hex');
@@ -48,7 +51,7 @@ function encrypt(text) {
 function decrypt(encryptedData) {
   try {
     // Decode base64
-    const combined = Buffer.from(encryptedData, 'base64').toString('hex');
+    const combined = Buffer.from(encryptedData, 'base64').toString();
     
     // Split the combined data
     const parts = combined.split(':');
@@ -60,8 +63,11 @@ function decrypt(encryptedData) {
     const authTag = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
     
-    // Create decipher
-    const decipher = crypto.createDecipher(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'hex'));
+    // Create a 32-byte key from the encryption key
+    const key = crypto.createHash('sha256').update(ENCRYPTION_KEY).digest();
+    
+    // Create decipher with proper GCM mode
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     
     // Set authentication tag
     decipher.setAuthTag(authTag);
@@ -113,7 +119,7 @@ function isValidEncryptedToken(token) {
     }
     
     // Try to decode and check format
-    const combined = Buffer.from(token, 'base64').toString('hex');
+    const combined = Buffer.from(token, 'base64').toString();
     const parts = combined.split(':');
     
     return parts.length === 3 && 
