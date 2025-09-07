@@ -1,0 +1,40 @@
+{
+  "name": "telegram-trading-bot-starter",
+  "version": "1.0.0",
+  "description": "A Telegram trading bot with Privy authentication",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "echo 'No build step required'",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "setup-webhook": "node setup-webhook.js",
+    "webhook-info": "node setup-webhook.js info",
+    "delete-webhook": "node setup-webhook.js delete",
+    "monitor-webhook": "node monitor-webhook.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "trading",
+    "privy",
+    "authentication"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@jup-ag/api": "^6.0.40",
+    "@privy-io/server-auth": "^1.20.2",
+    "@solana/web3.js": "^1.87.6",
+    "axios": "^1.8.4",
+    "dotenv": "^16.0.0",
+    "express": "^4.17.1",
+    "node-telegram-bot-api": "^0.61.0"
+  },
+  "devDependencies": {
+    "@types/node-telegram-bot-api": "^0.64.8"
+  },
+  "packageManager": "yarn@1.22.19+sha1.4ba7fc5c6e704fce2066ecbfb0b0d8976fe62447",
+  "engines": {
+    "node": ">=18.x"
+  }
+}
