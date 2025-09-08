@@ -302,6 +302,99 @@ function checkUserAuthentication(userId) {
 }
 
 /**
+ * Handles the /start command to display a welcome message and menu of available commands
+ * This is the default command that users see when they first interact with the bot
+ * 
+ * @param {Object} msg - Telegram message object
+ */
+bot.onText(/\/start/, async (msg) => {
+  const userId = msg.from.id;
+  const userName = msg.from.first_name || 'User';
+  console.log(`Processing /start command for user ${userId}`);
+  
+  try {
+    // Check if user is already authenticated
+    const authCheck = checkUserAuthentication(userId);
+    
+    let welcomeMessage = `👋 **Welcome to IntentKit Bot, ${userName}!**\n\n`;
+    welcomeMessage += `This bot helps you manage your Solana trading activities with secure authentication.\n\n`;
+    
+    if (authCheck.isAuthenticated && authCheck.hasValidToken) {
+      welcomeMessage += `✅ **You are currently authenticated**\n\n`;
+    } else {
+      welcomeMessage += `🔐 **Authentication required** to access all features\n\n`;
+    }
+    
+    welcomeMessage += `📋 **Available Commands:**\n\n`;
+    welcomeMessage += `❓ /start - Show this help menu\n\n`;
+    welcomeMessage += `🔑 /login - Authenticate with Privy\n`;
+    welcomeMessage += `📊 /status - Check your account status\n`;
+    if (authCheck.isAuthenticated && authCheck.hasValidToken) {
+      welcomeMessage += `🚪 /logout - Log out and clear credentials\n`;
+    }
+    welcomeMessage += `💡 **Quick Start:**\n`;
+    welcomeMessage += `1. Use /login to authenticate with Privy\n`;
+    welcomeMessage += `2. Use /status to check your account information\n`;
+    welcomeMessage += `3. Access your trading features with secure authentication\n\n`;
+    welcomeMessage += `🔒 **Security:** Your authentication data is encrypted and securely stored.`;
+    
+    // Create inline keyboard with main actions
+    const keyboard = [];
+    
+    if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+      keyboard.push([
+        {
+          text: '🔑 Login with Privy',
+          callback_data: 'quick_login'
+        }
+      ]);
+    } else {
+      keyboard.push([
+        {
+          text: '📊 Check Status',
+          callback_data: 'check_status'
+        }
+      ]);
+      keyboard.push([
+        {
+          text: '🚪 Logout',
+          callback_data: 'logout_user'
+        }
+      ]);
+    }
+    
+    keyboard.push([
+      {
+        text: '❓ Help',
+        callback_data: 'show_help'
+      }
+    ]);
+    
+    bot.sendMessage(
+      msg.chat.id,
+      welcomeMessage,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: keyboard
+        }
+      }
+    );
+    
+  } catch (error) {
+    console.error(`Error processing /start command for user ${userId}:`, error);
+    bot.sendMessage(
+      msg.chat.id,
+      '👋 **Welcome to IntentKit Bot!**\n\n' +
+      'Sorry, there was an error loading the full menu. Here are the basic commands:\n\n' +
+      '🔑 /login - Authenticate with Privy\n' +
+      '📊 /status - Check your account status\n' +
+      '❓ /start - Show this help menu'
+    );
+  }
+});
+
+/**
  * Handles the /login command to authenticate users with Privy
  * This command:
  * 1. Creates a login URL with Privy authentication
@@ -518,6 +611,91 @@ bot.onText(/\/status/, async (msg) => {
 });
 
 /**
+ * Handles the /logout command to clear user authentication data
+ * This command:
+ * 1. Clears the user's authentication status and access token
+ * 2. Sends confirmation message to the user
+ * 3. Provides option to re-authenticate
+ * 
+ * @param {Object} msg - Telegram message object
+ */
+bot.onText(/\/logout/, async (msg) => {
+  const userId = msg.from.id;
+  const userName = msg.from.first_name || 'User';
+  console.log(`Processing /logout command for user ${userId}`);
+  
+  try {
+    // Check if user is currently authenticated
+    const authCheck = checkUserAuthentication(userId);
+    
+    if (!authCheck.isAuthenticated) {
+      return bot.sendMessage(
+        msg.chat.id,
+        'ℹ️ **Already Logged Out**\n\n' +
+        'You are not currently authenticated. No logout action needed.\n\n' +
+        'Use /login to authenticate with Privy if you want to access bot features.',
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '🔑 Login with Privy',
+                  callback_data: 'quick_login'
+                }
+              ]
+            ]
+          }
+        }
+      );
+    }
+    
+    // Clear user authentication data
+    clearUserAuthData(userId);
+    
+    // Send logout confirmation message
+    bot.sendMessage(
+      msg.chat.id,
+      `👋 **Logout Successful, ${userName}!**\n\n` +
+      'Your authentication data has been cleared:\n' +
+      '• ✅ Authentication status reset\n' +
+      '• 🔑 Access token removed\n' +
+      '• 🔒 All credentials deleted\n\n' +
+      'You are now logged out and will need to re-authenticate to access bot features.',
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🔑 Login Again',
+                callback_data: 'quick_login'
+              }
+            ],
+            [
+              {
+                text: '🏠 Main Menu',
+                callback_data: 'back_to_start'
+              }
+            ]
+          ]
+        }
+      }
+    );
+    
+    console.log(`User ${userId} successfully logged out`);
+    
+  } catch (error) {
+    console.error(`Error processing /logout command for user ${userId}:`, error);
+    bot.sendMessage(
+      msg.chat.id,
+      '❌ Sorry, there was an error during logout. Please try again later.\n\n' +
+      'If this error persists, please contact support.'
+    );
+  }
+});
+
+/**
  * Handles the /accessToken command to retrieve and display user's Privy access token
  * This command:
  * 1. Retrieves the user's encrypted access token from database
@@ -675,6 +853,285 @@ bot.on('callback_query', async (callbackQuery) => {
       
       await bot.answerCallbackQuery(callbackQuery.id, {
         text: '❌ Error redirecting to login. Please try /login command.',
+        show_alert: true
+      });
+    }
+  }
+  
+  // Handle quick login request
+  if (data === 'quick_login') {
+    try {
+      // Answer the callback query
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: 'Redirecting to login...',
+        show_alert: false
+      });
+      
+      // Create the login URL for Privy authentication
+      const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
+      
+      // Send message with inline keyboard for login
+      bot.sendMessage(
+        callbackQuery.message.chat.id,
+        '🔐 **Login with Privy**\n\n' +
+        'Click the button below to authenticate with your Telegram account using Privy.\n\n' +
+        'This will securely link your Telegram account and enable seamless authentication.',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '🔑 Login with Privy',
+                  login_url: {
+                    url: loginUrl,
+                    forward_text: 'Login to IntentKit'
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      );
+      
+    } catch (error) {
+      console.error(`Error handling quick login for user ${userId}:`, error);
+      
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: '❌ Error redirecting to login. Please try /login command.',
+        show_alert: true
+      });
+    }
+  }
+
+  // Handle show help request
+  if (data === 'show_help') {
+    try {
+      // Answer the callback query
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: 'Showing help...',
+        show_alert: false
+      });
+      
+      const helpMessage = `📋 **IntentKit Bot Commands**\n\n` +
+        `🔑 **/login** - Authenticate with Privy\n` +
+        `   • Links your Telegram account with Privy\n` +
+        `   • Required for accessing all bot features\n\n` +
+        `📊 **/status** - Check your account status\n` +
+        `   • Shows authentication status\n` +
+        `   • Displays account information from API\n` +
+        `   • Shows wallet and user details\n\n` +
+        `🚪 **/logout** - Log out and clear credentials\n` +
+        `   • Clears your authentication data\n` +
+        `   • Removes access tokens\n` +
+        `   • Available only when authenticated\n\n` +
+        `❓ **/start** - Show this help menu\n` +
+        `   • Displays welcome message and command list\n` +
+        `   • Shows quick action buttons\n\n` +
+        `💡 **Quick Tips:**\n` +
+        `• Always authenticate first with /login\n` +
+        `• Use /status to verify your authentication\n` +
+        `• Use /logout to securely clear your data\n` +
+        `• Your data is encrypted and securely stored\n` +
+        `• Contact support if you encounter issues`;
+      
+      bot.sendMessage(
+        callbackQuery.message.chat.id,
+        helpMessage,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '🏠 Back to Main Menu',
+                  callback_data: 'back_to_start'
+                }
+              ]
+            ]
+          }
+        }
+      );
+      
+    } catch (error) {
+      console.error(`Error showing help for user ${userId}:`, error);
+      
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: '❌ Error showing help. Please try again.',
+        show_alert: true
+      });
+    }
+  }
+  
+  // Handle back to start menu
+  if (data === 'back_to_start') {
+    try {
+      // Answer the callback query
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: 'Returning to main menu...',
+        show_alert: false
+      });
+      
+      // Check if user is already authenticated
+      const authCheck = checkUserAuthentication(userId);
+      
+      let welcomeMessage = `👋 **Welcome to IntentKit Bot!**\n\n`;
+      welcomeMessage += `This bot helps you manage your Solana trading activities with secure authentication.\n\n`;
+      
+      if (authCheck.isAuthenticated && authCheck.hasValidToken) {
+        welcomeMessage += `✅ **You are currently authenticated**\n\n`;
+      } else {
+        welcomeMessage += `🔐 **Authentication required** to access all features\n\n`;
+      }
+      
+      welcomeMessage += `📋 **Available Commands:**\n\n`;
+      welcomeMessage += `🔑 /login - Authenticate with Privy\n`;
+      welcomeMessage += `📊 /status - Check your account status\n`;
+      welcomeMessage += `🎫 /accessToken - Get your access token\n`;
+      if (authCheck.isAuthenticated && authCheck.hasValidToken) {
+        welcomeMessage += `🚪 /logout - Log out and clear credentials\n`;
+      }
+      welcomeMessage += `❓ /start - Show this help menu\n\n`;
+      welcomeMessage += `💡 **Quick Start:**\n`;
+      welcomeMessage += `1. Use /login to authenticate with Privy\n`;
+      welcomeMessage += `2. Use /status to check your account information\n`;
+      welcomeMessage += `3. Access your trading features with secure authentication\n\n`;
+      welcomeMessage += `🔒 **Security:** Your authentication data is encrypted and securely stored.`;
+      
+      // Create inline keyboard with main actions
+      const keyboard = [];
+      
+      if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+        keyboard.push([
+          {
+            text: '🔑 Login with Privy',
+            callback_data: 'quick_login'
+          }
+        ]);
+      } else {
+        keyboard.push([
+          {
+            text: '📊 Check Status',
+            callback_data: 'check_status'
+          }
+        ]);
+        keyboard.push([
+          {
+            text: '🎫 Get Access Token',
+            callback_data: 'get_access_token'
+          }
+        ]);
+        keyboard.push([
+          {
+            text: '🚪 Logout',
+            callback_data: 'logout_user'
+          }
+        ]);
+      }
+      
+      keyboard.push([
+        {
+          text: '❓ Help',
+          callback_data: 'show_help'
+        }
+      ]);
+      
+      bot.sendMessage(
+        callbackQuery.message.chat.id,
+        welcomeMessage,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: keyboard
+          }
+        }
+      );
+      
+    } catch (error) {
+      console.error(`Error returning to start menu for user ${userId}:`, error);
+      
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: '❌ Error returning to menu. Please try /start command.',
+        show_alert: true
+      });
+    }
+  }
+  
+  // Handle logout request
+  if (data === 'logout_user') {
+    try {
+      // Answer the callback query
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: 'Logging out...',
+        show_alert: false
+      });
+      
+      // Check if user is currently authenticated
+      const authCheck = checkUserAuthentication(userId);
+      
+      if (!authCheck.isAuthenticated) {
+        bot.sendMessage(
+          callbackQuery.message.chat.id,
+          'ℹ️ **Already Logged Out**\n\n' +
+          'You are not currently authenticated. No logout action needed.\n\n' +
+          'Use /login to authenticate with Privy if you want to access bot features.',
+          { 
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '🔑 Login with Privy',
+                    callback_data: 'quick_login'
+                  }
+                ]
+              ]
+            }
+          }
+        );
+        return;
+      }
+      
+      // Clear user authentication data
+      clearUserAuthData(userId);
+      
+      // Send logout confirmation message
+      bot.sendMessage(
+        callbackQuery.message.chat.id,
+        `👋 **Logout Successful!**\n\n` +
+        'Your authentication data has been cleared:\n' +
+        '• ✅ Authentication status reset\n' +
+        '• 🔑 Access token removed\n' +
+        '• 🔒 All credentials deleted\n\n' +
+        'You are now logged out and will need to re-authenticate to access bot features.',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '🔑 Login Again',
+                  callback_data: 'quick_login'
+                }
+              ],
+              [
+                {
+                  text: '🏠 Main Menu',
+                  callback_data: 'back_to_start'
+                }
+              ]
+            ]
+          }
+        }
+      );
+      
+      console.log(`User ${userId} successfully logged out via callback`);
+      
+    } catch (error) {
+      console.error(`Error handling logout callback for user ${userId}:`, error);
+      
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: '❌ Error during logout. Please try again.',
         show_alert: true
       });
     }
