@@ -1231,8 +1231,31 @@ module.exports = app;
 const server = app.listen(port, '0.0.0.0', async () => {
   console.log(`Server is running on port ${port} and accessible from network`);
   
-  // If using polling, delete any existing webhook
-  if (process.env.USE_POLLING === 'true') {
+  // Auto-setup webhook for production deployment
+  if (process.env.NODE_ENV === 'production' && process.env.WEBHOOK_URL) {
+    try {
+      console.log('🔧 Setting up webhook automatically...');
+      const webhookUrl = process.env.WEBHOOK_URL;
+      await bot.setWebHook(webhookUrl, {
+        allowed_updates: ['message', 'callback_query', 'inline_query'],
+        drop_pending_updates: false,
+        max_connections: 40
+      });
+      console.log(`✅ Webhook set successfully to: ${webhookUrl}`);
+      
+      // Verify webhook setup
+      const webhookInfo = await bot.getWebHookInfo();
+      console.log('📊 Webhook info:', {
+        url: webhookInfo.url,
+        pending_updates: webhookInfo.pending_update_count,
+        max_connections: webhookInfo.max_connections
+      });
+    } catch (error) {
+      console.error('❌ Error setting up webhook:', error);
+      console.log('💡 You can manually set the webhook using: yarn setup-webhook');
+    }
+  } else if (process.env.USE_POLLING === 'true') {
+    // Fallback to polling mode if explicitly requested
     try {
       await bot.deleteWebHook();
       console.log('Webhook deleted, bot now running in polling mode');
@@ -1245,9 +1268,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
-  if (process.env.USE_POLLING === 'true') {
-    bot.stopPolling();
-  }
+  // No need to stop polling in webhook mode
   server.close(() => {
     console.log('Process terminated');
   });
