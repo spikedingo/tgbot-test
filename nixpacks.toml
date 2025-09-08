@@ -9,3 +9,6 @@ cmds = ['yarn build']
 
 [start]
 cmd = 'yarn start'
+
+# Alternative Railway start command with webhook setup
+# cmd = 'yarn start:railway'

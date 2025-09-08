@@ -1218,23 +1218,36 @@ bot.on('message', async (msg) => {
   }
 });
 
-// Export the Express app for Vercel
-module.exports = app;
-
-// Start server for Railway deployment
-const server = app.listen(port, '0.0.0.0', async () => {
-  console.log(`Server is running on port ${port} and accessible from network`);
+/**
+ * Setup webhook with retry logic for Railway deployment
+ */
+async function setupWebhookWithRetry(maxRetries = 3) {
+  const webhookUrl = process.env.WEBHOOK_URL;
   
-  // Auto-setup webhook for production deployment
-  if (process.env.NODE_ENV === 'production' && process.env.WEBHOOK_URL) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log('🔧 Setting up webhook automatically...');
-      const webhookUrl = process.env.WEBHOOK_URL;
+      console.log(`🔧 Setting up webhook automatically... (attempt ${attempt}/${maxRetries})`);
+      
+      // First, delete any existing webhook to ensure clean setup
+      try {
+        await bot.deleteWebHook();
+        console.log('🗑️  Cleared existing webhook');
+      } catch (error) {
+        // Ignore errors when deleting webhook (might not exist)
+        console.log('ℹ️  No existing webhook to clear');
+      }
+      
+      // Wait a moment before setting new webhook
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Set the new webhook
       await bot.setWebHook(webhookUrl, {
         allowed_updates: ['message', 'callback_query', 'inline_query'],
         drop_pending_updates: false,
-        max_connections: 40
+        max_connections: 40,
+        secret_token: process.env.WEBHOOK_SECRET || undefined
       });
+      
       console.log(`✅ Webhook set successfully to: ${webhookUrl}`);
       
       // Verify webhook setup
@@ -1242,12 +1255,41 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.log('📊 Webhook info:', {
         url: webhookInfo.url,
         pending_updates: webhookInfo.pending_update_count,
-        max_connections: webhookInfo.max_connections
+        max_connections: webhookInfo.max_connections,
+        has_custom_certificate: webhookInfo.has_custom_certificate
       });
+      
+      // Success - break out of retry loop
+      return;
+      
     } catch (error) {
-      console.error('❌ Error setting up webhook:', error);
-      console.log('💡 You can manually set the webhook using: yarn setup-webhook');
+      console.error(`❌ Webhook setup attempt ${attempt} failed:`, error.message);
+      
+      if (attempt === maxRetries) {
+        console.error('❌ All webhook setup attempts failed');
+        console.log('💡 You can manually set the webhook using: yarn setup-webhook');
+        console.log('💡 Or call: curl -X POST https://tgbot-test-production.up.railway.app/set-webhook');
+      } else {
+        console.log(`⏳ Retrying in ${attempt * 2} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+      }
     }
+  }
+}
+
+// Export the Express app for Vercel
+module.exports = app;
+
+// Start server for Railway deployment
+const server = app.listen(port, '0.0.0.0', async () => {
+  console.log(`Server is running on port ${port} and accessible from network`);
+  
+  // Auto-setup webhook for production deployment with retry logic
+  if (process.env.NODE_ENV === 'production' && process.env.WEBHOOK_URL) {
+    // Delay webhook setup to ensure server is fully ready
+    setTimeout(async () => {
+      await setupWebhookWithRetry();
+    }, 5000); // Wait 5 seconds after server start
   } else if (process.env.USE_POLLING === 'true') {
     // Fallback to polling mode if explicitly requested
     try {
