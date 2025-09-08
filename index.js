@@ -326,7 +326,7 @@ bot.onText(/\/start/, async (msg) => {
     }
     
     welcomeMessage += `📋 **Available Commands:**\n\n`;
-    welcomeMessage += `❓ /start - Show this help menu\n\n`;
+    welcomeMessage += `❓ /start - Show this help menu\n`;
     welcomeMessage += `🔑 /login - Authenticate with Privy\n`;
     welcomeMessage += `📊 /status - Check your account status\n`;
     if (authCheck.isAuthenticated && authCheck.hasValidToken) {
@@ -342,10 +342,14 @@ bot.onText(/\/start/, async (msg) => {
     const keyboard = [];
     
     if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+      const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
       keyboard.push([
         {
           text: '🔑 Login with Privy',
-          callback_data: 'quick_login'
+          login_url: {
+            url: loginUrl,
+            forward_text: 'Login to IntentKit'
+          }
         }
       ]);
     } else {
@@ -641,7 +645,10 @@ bot.onText(/\/logout/, async (msg) => {
               [
                 {
                   text: '🔑 Login with Privy',
-                  callback_data: 'quick_login'
+                  login_url: {
+                    url: `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`,
+                    forward_text: 'Login to IntentKit'
+                  }
                 }
               ]
             ]
@@ -669,7 +676,10 @@ bot.onText(/\/logout/, async (msg) => {
             [
               {
                 text: '🔑 Login Again',
-                callback_data: 'quick_login'
+                login_url: {
+                  url: `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`,
+                  forward_text: 'Login to IntentKit'
+                }
               }
             ],
             [
@@ -858,51 +868,6 @@ bot.on('callback_query', async (callbackQuery) => {
     }
   }
   
-  // Handle quick login request
-  if (data === 'quick_login') {
-    try {
-      // Answer the callback query
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: 'Redirecting to login...',
-        show_alert: false
-      });
-      
-      // Create the login URL for Privy authentication
-      const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
-      
-      // Send message with inline keyboard for login
-      bot.sendMessage(
-        callbackQuery.message.chat.id,
-        '🔐 **Login with Privy**\n\n' +
-        'Click the button below to authenticate with your Telegram account using Privy.\n\n' +
-        'This will securely link your Telegram account and enable seamless authentication.',
-        {
-          parse_mode: 'Markdown',
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: '🔑 Login with Privy',
-                  login_url: {
-                    url: loginUrl,
-                    forward_text: 'Login to IntentKit'
-                  }
-                }
-              ]
-            ]
-          }
-        }
-      );
-      
-    } catch (error) {
-      console.error(`Error handling quick login for user ${userId}:`, error);
-      
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: '❌ Error redirecting to login. Please try /login command.',
-        show_alert: true
-      });
-    }
-  }
 
   // Handle show help request
   if (data === 'show_help') {
@@ -1002,10 +967,14 @@ bot.on('callback_query', async (callbackQuery) => {
       const keyboard = [];
       
       if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+        const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
         keyboard.push([
           {
             text: '🔑 Login with Privy',
-            callback_data: 'quick_login'
+            login_url: {
+              url: loginUrl,
+              forward_text: 'Login to IntentKit'
+            }
           }
         ]);
       } else {
@@ -1082,7 +1051,10 @@ bot.on('callback_query', async (callbackQuery) => {
                 [
                   {
                     text: '🔑 Login with Privy',
-                    callback_data: 'quick_login'
+                    login_url: {
+                      url: `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`,
+                      forward_text: 'Login to IntentKit'
+                    }
                   }
                 ]
               ]
@@ -1111,7 +1083,10 @@ bot.on('callback_query', async (callbackQuery) => {
               [
                 {
                   text: '🔑 Login Again',
-                  callback_data: 'quick_login'
+                  login_url: {
+                    url: `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`,
+                    forward_text: 'Login to IntentKit'
+                  }
                 }
               ],
               [
