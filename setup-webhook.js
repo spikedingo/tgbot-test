@@ -17,7 +17,8 @@ const https = require('https');
 const { URL } = require('url');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://tgbot-test-production.up.railway.app/webhook';
+const WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL;
+const WEBHOOK_URL = `${WEBHOOK_BASE_URL}/webhook`;
 
 if (!BOT_TOKEN) {
   console.error('❌ TELEGRAM_BOT_TOKEN is required');
@@ -89,7 +90,6 @@ async function setWebhook(webhookUrl) {
       allowed_updates: ['message', 'callback_query', 'inline_query'],
       drop_pending_updates: false,
       max_connections: 40,
-      secret_token: process.env.WEBHOOK_SECRET || undefined
     });
     
     console.log('✅ Webhook set successfully!');

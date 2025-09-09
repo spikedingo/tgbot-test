@@ -15,7 +15,9 @@
       "variables": {
         "NODE_ENV": "production",
         "USE_POLLING": "false",
-        "WEBHOOK_URL": "https://tgbot-test-production.up.railway.app/webhook"
+        "WEBHOOK_BASE_URL": "https://tgbot-test-production.up.railway.app",
+        "WEB_APP_URL": "https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app",
+        "NATION_SERVICE_URL": "https://nation.service.crestal.dev"
       }
     }
   }

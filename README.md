@@ -39,8 +39,6 @@ cp .env.example .env.local
 4. Edit `.env.local` with your credentials:
 ```env
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-PRIVY_APP_ID=your_privy_app_id
-PRIVY_APP_SECRET=your_privy_app_secret
 ```
 
 ## Database

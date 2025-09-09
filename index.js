@@ -9,6 +9,15 @@ const { getUserAccount } = require('./api/nation');
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Helper function to generate login URL with user ID
+function generateLoginUrl(userId) {
+  const baseUrl = process.env.WEB_APP_URL;
+  if (!baseUrl) {
+    throw new Error('WEB_APP_URL environment variable is not set');
+  }
+  return `${baseUrl}/login?user_id=${userId}`;
+}
+
 // Initialize Telegram bot with polling for Railway deployment
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { 
   polling: false,
@@ -116,7 +125,7 @@ app.get('/webhook-status', async (req, res) => {
 // Set webhook endpoint
 app.post('/set-webhook', async (req, res) => {
   try {
-    const webhookUrl = process.env.WEBHOOK_URL || `https://${req.get('host')}/webhook`;
+    const webhookUrl = process.env.WEBHOOK_BASE_URL ? `${process.env.WEBHOOK_BASE_URL}/webhook` : `https://${req.get('host')}/webhook`;
     await bot.setWebHook(webhookUrl, {
       allowed_updates: ['message', 'callback_query', 'inline_query'],
       drop_pending_updates: false
@@ -134,7 +143,7 @@ app.post('/auto-reset-webhook', async (req, res) => {
   try {
     // Check if webhook needs to be reset
     const webhookInfo = await bot.getWebHookInfo();
-    const expectedUrl = process.env.WEBHOOK_URL || `https://${req.get('host')}/webhook`;
+    const expectedUrl = process.env.WEBHOOK_BASE_URL ? `${process.env.WEBHOOK_BASE_URL}/webhook` : `https://${req.get('host')}/webhook`;
     
     let needsReset = false;
     let reason = '';
@@ -336,7 +345,7 @@ bot.onText(/\/start/, async (msg) => {
     const keyboard = [];
     
     if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
-      const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
+      const loginUrl = generateLoginUrl(userId);
       keyboard.push([
         {
           text: '🔑 Login with Privy',
@@ -408,7 +417,7 @@ bot.onText(/\/login/, async (msg) => {
   try {
     // Create the login URL for Privy authentication
     // The URL should point to your web application with Privy configured
-    const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
+    const loginUrl = generateLoginUrl(userId);
     
     // Check if user is already authenticated
     const authCheck = checkUserAuthentication(userId);
@@ -640,7 +649,7 @@ bot.onText(/\/logout/, async (msg) => {
                 {
                   text: '🔑 Login with Privy',
                   login_url: {
-                    url: `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`,
+                    url: generateLoginUrl(userId),
                     forward_text: 'Login to IntentKit'
                   }
                 }
@@ -667,15 +676,15 @@ bot.onText(/\/logout/, async (msg) => {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
-            [
-              {
-                text: '🔑 Login Again',
-                login_url: {
-                  url: `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`,
-                  forward_text: 'Login to IntentKit'
-                }
-              }
-            ],
+                [
+                  {
+                    text: '🔑 Login Again',
+                    login_url: {
+                      url: generateLoginUrl(userId),
+                      forward_text: 'Login to IntentKit'
+                    }
+                  }
+                ],
             [
               {
                 text: '🏠 Main Menu',
@@ -826,7 +835,7 @@ bot.on('callback_query', async (callbackQuery) => {
       });
       
       // Create the login URL for Privy authentication
-      const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
+      const loginUrl = generateLoginUrl(userId);
       
       // Send message with inline keyboard for re-authentication
       bot.sendMessage(
@@ -961,7 +970,7 @@ bot.on('callback_query', async (callbackQuery) => {
       const keyboard = [];
       
       if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
-        const loginUrl = `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`;
+        const loginUrl = generateLoginUrl(userId);
         keyboard.push([
           {
             text: '🔑 Login with Privy',
@@ -1046,7 +1055,7 @@ bot.on('callback_query', async (callbackQuery) => {
                   {
                     text: '🔑 Login with Privy',
                     login_url: {
-                      url: `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`,
+                      url: generateLoginUrl(userId),
                       forward_text: 'Login to IntentKit'
                     }
                   }
@@ -1078,7 +1087,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 {
                   text: '🔑 Login Again',
                   login_url: {
-                    url: `https://intentkit-tg-bot-git-featuseexpress-crestal.vercel.app/login?user_id=${userId}`,
+                    url: generateLoginUrl(userId),
                     forward_text: 'Login to IntentKit'
                   }
                 }
@@ -1222,7 +1231,7 @@ bot.on('message', async (msg) => {
  * Setup webhook with retry logic for Railway deployment
  */
 async function setupWebhookWithRetry(maxRetries = 3) {
-  const webhookUrl = process.env.WEBHOOK_URL;
+  const webhookUrl = process.env.WEBHOOK_BASE_URL ? `${process.env.WEBHOOK_BASE_URL}/webhook` : null;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -1268,7 +1277,7 @@ async function setupWebhookWithRetry(maxRetries = 3) {
       if (attempt === maxRetries) {
         console.error('❌ All webhook setup attempts failed');
         console.log('💡 You can manually set the webhook using: yarn setup-webhook');
-        console.log('💡 Or call: curl -X POST https://tgbot-test-production.up.railway.app/set-webhook');
+        console.log(`💡 Or call: curl -X POST ${process.env.WEBHOOK_BASE_URL}/set-webhook`);
       } else {
         console.log(`⏳ Retrying in ${attempt * 2} seconds...`);
         await new Promise(resolve => setTimeout(resolve, attempt * 2000));
@@ -1285,7 +1294,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
   console.log(`Server is running on port ${port} and accessible from network`);
   
   // Auto-setup webhook for production deployment with retry logic
-  if (process.env.NODE_ENV === 'production' && process.env.WEBHOOK_URL) {
+  if (process.env.NODE_ENV === 'production' && process.env.WEBHOOK_BASE_URL) {
     // Delay webhook setup to ensure server is fully ready
     setTimeout(async () => {
       await setupWebhookWithRetry();

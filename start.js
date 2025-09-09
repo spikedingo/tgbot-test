@@ -21,7 +21,7 @@ const serverProcess = spawn('node', ['index.js'], {
 
 // Wait for server to be ready, then set webhook
 setTimeout(async () => {
-  if (process.env.NODE_ENV === 'production' && process.env.WEBHOOK_URL) {
+  if (process.env.NODE_ENV === 'production' && process.env.WEBHOOK_BASE_URL) {
     console.log('⏳ Waiting for server to be fully ready...');
     
     // Test if server is responding
@@ -84,8 +84,8 @@ async function waitForServer(maxAttempts = 10) {
  * Setup webhook using external endpoint
  */
 async function setupWebhook() {
-  const webhookUrl = process.env.WEBHOOK_URL;
-  const setupUrl = webhookUrl.replace('/webhook', '/set-webhook');
+  const webhookUrl = `${process.env.WEBHOOK_BASE_URL}/webhook`;
+  const setupUrl = `${process.env.WEBHOOK_BASE_URL}/set-webhook`;
   
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({ webhook_url: webhookUrl });

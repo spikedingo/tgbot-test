@@ -15,7 +15,7 @@ const { Configuration, CreditApi } = require('@crestal/nation-sdk');
 const getCreditExpenseHistory = async (params) => {
   try {
     const configuration = new Configuration({
-      basePath: 'https://nation.service.crestal.dev',
+      basePath: process.env.NATION_SERVICE_URL,
       accessToken: params.accessToken
     });
     const creditApi = new CreditApi(configuration);
@@ -43,7 +43,7 @@ const getCreditExpenseHistory = async (params) => {
 const getUserAccount = async (accessToken) => {
   try {
     const configuration = new Configuration({
-      basePath: 'https://nation.service.crestal.dev',
+      basePath: process.env.NATION_SERVICE_URL,
       accessToken: accessToken
     });
     const creditApi = new CreditApi(configuration);

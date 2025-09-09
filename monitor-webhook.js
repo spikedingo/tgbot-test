@@ -14,12 +14,13 @@ require('dotenv').config({ path: '.env.local' });
 const https = require('https');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const WEBHOOK_URL = process.env.WEBHOOK_URL;
-const SERVER_URL = process.env.WEBHOOK_URL ? process.env.WEBHOOK_URL.replace('/webhook', '') : null;
+const WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL;
+const WEBHOOK_URL = WEBHOOK_BASE_URL ? `${WEBHOOK_BASE_URL}/webhook` : null;
+const SERVER_URL = WEBHOOK_BASE_URL;
 
-if (!BOT_TOKEN || !WEBHOOK_URL || !SERVER_URL) {
+if (!BOT_TOKEN || !WEBHOOK_BASE_URL) {
   console.error('❌ Missing required environment variables');
-  console.log('Required: TELEGRAM_BOT_TOKEN, WEBHOOK_URL');
+  console.log('Required: TELEGRAM_BOT_TOKEN, WEBHOOK_BASE_URL');
   process.exit(1);
 }
 

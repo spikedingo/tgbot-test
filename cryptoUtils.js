@@ -6,7 +6,7 @@ const crypto = require('crypto');
  */
 
 // Get encryption key from environment variables
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'intentkit_secret_default_key_32_bytes';
+const ENCRYPTION_KEY = 'intentkit_secret_default_key_32_bytes';
 const ALGORITHM = 'aes-256-gcm';
 
 /**
