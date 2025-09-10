@@ -134,10 +134,32 @@ const getUserAgents = async (params) => {
   }
 };
 
+/**
+ * Get a specific agent by ID
+ * @param {Object} params - The parameters for the API call
+ * @param {string} params.accessToken - The access token for authentication
+ * @param {string} params.agentId - The agent ID to retrieve
+ * @returns {Promise<Object>} The agent data
+ */
+const getAgent = async (params) => {
+  try {
+    const configuration = new Configuration({
+      basePath: process.env.NATION_SERVICE_URL,
+      accessToken: params.accessToken
+    });
+    const agentApi = new AgentApi(configuration);
+    const {data} = await agentApi.getAgent(params.agentId);
+    return data;
+  } catch (err) {
+    throw err;
+  }
+};
+
 module.exports = {
   getCreditExpenseHistory,
   getUserAccount,
   generateAgent,
   createAgent,
-  getUserAgents
+  getUserAgents,
+  getAgent
 };

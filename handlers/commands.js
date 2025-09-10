@@ -7,7 +7,7 @@ const { createMainMenuKeyboard } = require('../utils/keyboards');
 const { createLoginKeyboard } = require('../utils/keyboards');
 const { createLogoutKeyboard } = require('../utils/keyboards');
 const { generateLoginUrl } = require('../config/bot');
-const { getUserAccount, generateAgent, createAgent, getUserAgents } = require('../api/nation');
+const { getUserAccount, generateAgent, createAgent, getUserAgents, getAgent } = require('../api/nation');
 const { createAgentCreationKeyboard } = require('../utils/keyboards');
 const { setUserState } = require('../utils/userState');
 
@@ -503,7 +503,8 @@ async function handleMyAgentsCommand(bot, msg) {
       message += 'You don\'t have any agents yet.\n\n' +
                 'Use /create_agent to create your first agent!';
     } else {
-      message += `Found ${agentsData.data.length} agent(s):\n\n`;
+      message += `Found ${agentsData.data.length} agent(s):\n`;
+      message += `You can use /get_agent <agent_id> to get the information of a specific agent.\n\n`;
       
       agentsData.data.forEach((agent, index) => {
         message += `**${index + 1}. ${agent.name || 'Unnamed Agent'}**\n`;
@@ -564,6 +565,172 @@ async function handleMyAgentsCommand(bot, msg) {
   }
 }
 
+/**
+ * Validates if the provided agent ID matches the expected format
+ * Based on the example ID: d0o1lqvd14ts73arku3g
+ * @param {string} agentId - The agent ID to validate
+ * @returns {boolean} True if the ID format is valid
+ */
+function validateAgentId(agentId) {
+  // Agent ID should be alphanumeric, 20 characters long
+  // Based on the example: d0o1lqvd14ts73arku3g
+  const agentIdPattern = /^[a-z0-9]{20}$/;
+  return agentIdPattern.test(agentId);
+}
+
+/**
+ * Handles the /get_agent command to retrieve a specific agent by ID
+ * This command:
+ * 1. Checks if user is authenticated
+ * 2. Validates the agent ID format
+ * 3. Calls getAgent API to fetch the specific agent
+ * 4. Displays the agent information in JSON format
+ * 
+ * @param {Object} bot - Telegram bot instance
+ * @param {Object} msg - Telegram message object
+ */
+async function handleGetAgentCommand(bot, msg) {
+  const userId = msg.from.id;
+  const userName = msg.from.first_name || 'User';
+  console.log(`Processing /get_agent command for user ${userId}`);
+  
+  try {
+    // Check if user is authenticated
+    const authCheck = checkUserAuthentication(userId);
+    
+    if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+      let statusMessage = `🤖 **Get Agent**\n\n`;
+      
+      if (!authCheck.isAuthenticated) {
+        statusMessage += `Authentication: ❌ Not authenticated\n\n`;
+        statusMessage += `Use /login to authenticate with Privy first to get agent information.`;
+      } else if (!authCheck.hasValidToken) {
+        statusMessage += `Authentication: ❌ Access token not found or expired\n\n`;
+        statusMessage += `Please re-authenticate using /login to get agent information.`;
+        clearUserAuthData(userId);
+      }
+      
+      bot.sendMessage(
+        msg.chat.id,
+        statusMessage,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: createReauthKeyboard(userId)
+          }
+        }
+      );
+      return;
+    }
+
+    // Extract agent ID from command text
+    const commandText = msg.text.trim();
+    const parts = commandText.split(' ');
+    
+    if (parts.length < 2) {
+      bot.sendMessage(
+        msg.chat.id,
+        `🤖 **Get Agent**\n\n` +
+        `Usage: \`/get_agent <agent_id>\`\n\n` +
+        `**Examples:**\n` +
+        `• \`/get_agent d0o1lqvd14ts73arku3g\`\n` +
+        `• \`/get_agent abc123def456ghi789j\`\n\n` +
+        `**Agent ID Format:**\n` +
+        `• Must be exactly 20 characters long\n` +
+        `• Must contain only lowercase letters and numbers\n` +
+        `• Example: \`d0o1lqvd14ts73arku3g\`\n\n` +
+        `Use /my_agents to see your available agents and their IDs.`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+
+    const agentId = parts[1];
+    
+    // Validate agent ID format
+    if (!validateAgentId(agentId)) {
+      bot.sendMessage(
+        msg.chat.id,
+        `❌ **Invalid Agent ID Format**\n\n` +
+        `The agent ID \`${agentId}\` is not valid.\n\n` +
+        `**Requirements:**\n` +
+        `• Must be exactly 20 characters long\n` +
+        `• Must contain only lowercase letters (a-z) and numbers (0-9)\n` +
+        `• No spaces, special characters, or uppercase letters\n\n` +
+        `**Valid Example:** \`d0o1lqvd14ts73arku3g\`\n\n` +
+        `Please check the agent ID and try again.`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    // Show loading message
+    const loadingMessage = await bot.sendMessage(
+      msg.chat.id,
+      '🔄 Loading agent information...'
+    );
+
+    // Get access token
+    const accessToken = getUserAccessToken(userId);
+    
+    // Get the specific agent
+    const agentData = await getAgent({
+      accessToken: accessToken,
+      agentId: agentId
+    });
+
+    // Format the response with JSON display
+    let message = `🤖 **Agent Information**\n\n`;
+    message += `**Agent ID:** \`${agentId}\`\n\n`;
+    message += `**JSON Data:**\n`;
+    message += `\`\`\`json\n${JSON.stringify(agentData, null, 2)}\n\`\`\``;
+
+    // Update the loading message with the results
+    bot.editMessageText(
+      message,
+      {
+        chat_id: msg.chat.id,
+        message_id: loadingMessage.message_id,
+        parse_mode: 'Markdown'
+      }
+    );
+
+    console.log(`Successfully retrieved agent ${agentId} for user ${userId}`);
+
+  } catch (error) {
+    console.error(`Error processing /get_agent command for user ${userId}:`, error);
+    
+    // Try to edit the loading message if it exists
+    try {
+      await bot.editMessageText(
+        '❌ **Error loading agent**\n\n' +
+        'There was an error retrieving the agent information. This could be because:\n\n' +
+        '• The agent ID is invalid or doesn\'t exist\n' +
+        '• You don\'t have permission to access this agent\n' +
+        '• There was a network error\n' +
+        '• The agent service is temporarily unavailable\n\n' +
+        '**Error Details:**\n' +
+        `\`${error.message || 'Unknown error'}\`\n\n` +
+        'Please check the agent ID and try again, or use /my_agents to see your available agents.',
+        {
+          chat_id: msg.chat.id,
+          message_id: loadingMessage.message_id,
+          parse_mode: 'Markdown'
+        }
+      );
+    } catch (editError) {
+      // If editing fails, send a new message
+      bot.sendMessage(
+        msg.chat.id,
+        '❌ **Error loading agent**\n\n' +
+        'There was an error retrieving the agent information. Please check the agent ID and try again.\n\n' +
+        `**Error:** ${error.message || 'Unknown error'}`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+  }
+}
+
 module.exports = {
   handleStartCommand,
   handleLoginCommand,
@@ -571,5 +738,6 @@ module.exports = {
   handleStatusCommand,
   handleAccessTokenCommand,
   handleCreateAgentCommand,
-  handleMyAgentsCommand
+  handleMyAgentsCommand,
+  handleGetAgentCommand
 };
