@@ -13,7 +13,8 @@ const {
   handleAccessTokenCommand,
   handleCreateAgentCommand,
   handleMyAgentsCommand,
-  handleGetAgentCommand
+  handleGetAgentCommand,
+  handleHelpCommand
 } = require('./handlers/commands');
 
 // Import callback handlers
@@ -81,6 +82,7 @@ bot.onText(new RegExp(COMMANDS.ACCESS_TOKEN), (msg) => handleAccessTokenCommand(
 bot.onText(new RegExp(COMMANDS.CREATE_AGENT), (msg) => handleCreateAgentCommand(bot, msg));
 bot.onText(new RegExp(COMMANDS.MY_AGENTS), (msg) => handleMyAgentsCommand(bot, msg));
 bot.onText(new RegExp(COMMANDS.GET_AGENT), (msg) => handleGetAgentCommand(bot, msg));
+bot.onText(new RegExp(COMMANDS.HELP), (msg) => handleHelpCommand(bot, msg));
 
 // Setup callback query handler
 bot.on('callback_query', (callbackQuery) => handleCallbackQuery(bot, callbackQuery));

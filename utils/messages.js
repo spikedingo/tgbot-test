@@ -20,11 +20,15 @@ function createWelcomeMessage(userName, authCheck) {
   }
   
   message += MESSAGES.COMMANDS_HEADER;
-  message += `❓ ${COMMANDS.START} - Show this help menu\n`;
+  message += `❓ ${COMMANDS.START} - Show this welcome menu\n`;
+  message += `📚 ${COMMANDS.HELP} - Show detailed help and commands\n`;
   message += `🔑 ${COMMANDS.LOGIN} - Authenticate with Privy\n`;
   message += `📊 ${COMMANDS.STATUS} - Check your account status\n`;
   
   if (authCheck.isAuthenticated && authCheck.hasValidToken) {
+    message += `🤖 ${COMMANDS.CREATE_AGENT} - Create a new agent\n`;
+    message += `📋 ${COMMANDS.MY_AGENTS} - View your agents\n`;
+    message += `🔍 ${COMMANDS.GET_AGENT} - Get specific agent details (Usage: /getAgent [agent-id])\n`;
     message += `🚪 ${COMMANDS.LOGOUT} - Log out and clear credentials\n`;
   }
   
@@ -39,29 +43,42 @@ function createWelcomeMessage(userName, authCheck) {
  * @returns {string} Formatted help message
  */
 function createHelpMessage() {
-  return `📋 **IntentKit Bot Commands**\n\n` +
-         `🔑 **${COMMANDS.LOGIN}** - Authenticate with Privy\n` +
+  return `📋 IntentKit Bot Commands\n\n` +
+         `🔑 ${COMMANDS.LOGIN} - Authenticate with Privy\n` +
          `   • Links your Telegram account with Privy\n` +
          `   • Required for accessing all bot features\n\n` +
-         `📊 **${COMMANDS.STATUS}** - Check your account status\n` +
+         `📊 ${COMMANDS.STATUS} - Check your account status\n` +
          `   • Shows authentication status\n` +
          `   • Displays account information from API\n` +
          `   • Shows wallet and user details\n\n` +
-         `🤖 **${COMMANDS.MY_AGENTS}** - View your agents\n` +
+         `🤖 ${COMMANDS.CREATE_AGENT} - Create a new agent\n` +
+         `   • Create agents from natural language prompts\n` +
+         `   • Define automated trading tasks\n` +
+         `   • Requires authentication\n\n` +
+         `📋 ${COMMANDS.MY_AGENTS} - View your agents\n` +
          `   • Lists all your created agents\n` +
          `   • Shows agent details and status\n` +
          `   • Available only when authenticated\n\n` +
-         `🚪 **${COMMANDS.LOGOUT}** - Log out and clear credentials\n` +
+         `🔍 ${COMMANDS.GET_AGENT} - Get specific agent details\n` +
+         `   • Usage: ${COMMANDS.GET_AGENT} [agent-id]\n` +
+         `   • Shows detailed agent information in JSON format\n` +
+         `   • Requires authentication\n\n` +
+         `🚪 ${COMMANDS.LOGOUT} - Log out and clear credentials\n` +
          `   • Clears your authentication data\n` +
          `   • Removes access tokens\n` +
          `   • Available only when authenticated\n\n` +
-         `❓ **${COMMANDS.START}** - Show this help menu\n` +
+         `❓ ${COMMANDS.START} - Show welcome menu\n` +
          `   • Displays welcome message and command list\n` +
          `   • Shows quick action buttons\n\n` +
-         `💡 **Quick Tips:**\n` +
+         `📚 ${COMMANDS.HELP} - Show this help menu\n` +
+         `   • Displays detailed command explanations\n` +
+         `   • Available anytime\n\n` +
+         `💡 Quick Tips:\n` +
          `• Always authenticate first with ${COMMANDS.LOGIN}\n` +
          `• Use ${COMMANDS.STATUS} to verify your authentication\n` +
+         `• Use ${COMMANDS.CREATE_AGENT} to create new automated agents\n` +
          `• Use ${COMMANDS.MY_AGENTS} to view your agents\n` +
+         `• Use <code>${COMMANDS.GET_AGENT} [agent-id]</code> to get detailed agent info\n` +
          `• Use ${COMMANDS.LOGOUT} to securely clear your data\n` +
          `• Your data is encrypted and securely stored\n` +
          `• Contact support if you encounter issues`;

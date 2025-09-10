@@ -8,9 +8,10 @@ const COMMANDS = {
   STATUS: '/status',
   LOGOUT: '/logout',
   ACCESS_TOKEN: '/accessToken',
-  CREATE_AGENT: '/create_agent',
-  MY_AGENTS: '/my_agents',
-  GET_AGENT: '/get_agent'
+  CREATE_AGENT: '/createAgent',
+  MY_AGENTS: '/myAgents',
+  GET_AGENT: '/getAgent',
+  HELP: '/help'
 };
 
 const CALLBACK_DATA = {

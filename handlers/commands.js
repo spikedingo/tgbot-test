@@ -2,7 +2,7 @@ const { createReauthKeyboard } = require('../utils/keyboards');
 const { checkUserAuthentication, handleInvalidToken } = require('../utils/auth');
 const { getUserAccessToken, clearUserAuthData } = require('../mockDb');
 const { createStatusMessage, createErrorMessage } = require('../utils/messages');
-const { createWelcomeMessage } = require('../utils/messages');
+const { createWelcomeMessage, createHelpMessage } = require('../utils/messages');
 const { createMainMenuKeyboard } = require('../utils/keyboards');
 const { createLoginKeyboard } = require('../utils/keyboards');
 const { createLogoutKeyboard } = require('../utils/keyboards');
@@ -30,17 +30,11 @@ async function handleStartCommand(bot, msg) {
     // Create welcome message
     const welcomeMessage = createWelcomeMessage(userName, authCheck);
     
-    // Create inline keyboard with main actions
-    const keyboard = createMainMenuKeyboard(authCheck, userId);
-    
     bot.sendMessage(
       msg.chat.id,
       welcomeMessage,
       {
         parse_mode: 'Markdown',
-        reply_markup: {
-          inline_keyboard: keyboard
-        }
       }
     );
     
@@ -731,6 +725,49 @@ async function handleGetAgentCommand(bot, msg) {
   }
 }
 
+/**
+ * Handles the /help command to display all available commands and their descriptions
+ * This command provides detailed information about all bot features
+ * 
+ * @param {Object} bot - Telegram bot instance
+ * @param {Object} msg - Telegram message object
+ */
+async function handleHelpCommand(bot, msg) {
+  const userId = msg.from.id;
+  console.log(`Processing /help command for user ${userId}`);
+  
+  try {
+    // Create help message
+    const helpMessage = createHelpMessage();
+    
+    bot.sendMessage(
+      msg.chat.id,
+      helpMessage,
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🏠 Back to Main Menu',
+                callback_data: 'back_to_start'
+              }
+            ]
+          ]
+        }
+      }
+    );
+    
+  } catch (error) {
+    console.error(`Error processing /help command for user ${userId}:`, error);
+    bot.sendMessage(
+      msg.chat.id,
+      '❌ Sorry, there was an error displaying the help menu. Please try again later.\n\n' +
+      'If this error persists, please contact support.'
+    );
+  }
+}
+
 module.exports = {
   handleStartCommand,
   handleLoginCommand,
@@ -739,5 +776,6 @@ module.exports = {
   handleAccessTokenCommand,
   handleCreateAgentCommand,
   handleMyAgentsCommand,
-  handleGetAgentCommand
+  handleGetAgentCommand,
+  handleHelpCommand
 };
