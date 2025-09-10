@@ -11,7 +11,8 @@ const {
   handleStatusCommand,
   handleLogoutCommand,
   handleAccessTokenCommand,
-  handleCreateAgentCommand
+  handleCreateAgentCommand,
+  handleMyAgentsCommand
 } = require('./handlers/commands');
 
 // Import callback handlers
@@ -77,6 +78,7 @@ bot.onText(new RegExp(COMMANDS.STATUS), (msg) => handleStatusCommand(bot, msg));
 bot.onText(new RegExp(COMMANDS.LOGOUT), (msg) => handleLogoutCommand(bot, msg));
 bot.onText(new RegExp(COMMANDS.ACCESS_TOKEN), (msg) => handleAccessTokenCommand(bot, msg));
 bot.onText(new RegExp(COMMANDS.CREATE_AGENT), (msg) => handleCreateAgentCommand(bot, msg));
+bot.onText(new RegExp(COMMANDS.MY_AGENTS), (msg) => handleMyAgentsCommand(bot, msg));
 
 // Setup callback query handler
 bot.on('callback_query', (callbackQuery) => handleCallbackQuery(bot, callbackQuery));

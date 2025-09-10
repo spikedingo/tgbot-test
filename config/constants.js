@@ -8,7 +8,8 @@ const COMMANDS = {
   STATUS: '/status',
   LOGOUT: '/logout',
   ACCESS_TOKEN: '/accessToken',
-  CREATE_AGENT: '/create_agent'
+  CREATE_AGENT: '/create_agent',
+  MY_AGENTS: '/my_agents'
 };
 
 const CALLBACK_DATA = {

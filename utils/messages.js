@@ -47,6 +47,10 @@ function createHelpMessage() {
          `   • Shows authentication status\n` +
          `   • Displays account information from API\n` +
          `   • Shows wallet and user details\n\n` +
+         `🤖 **${COMMANDS.MY_AGENTS}** - View your agents\n` +
+         `   • Lists all your created agents\n` +
+         `   • Shows agent details and status\n` +
+         `   • Available only when authenticated\n\n` +
          `🚪 **${COMMANDS.LOGOUT}** - Log out and clear credentials\n` +
          `   • Clears your authentication data\n` +
          `   • Removes access tokens\n` +
@@ -57,6 +61,7 @@ function createHelpMessage() {
          `💡 **Quick Tips:**\n` +
          `• Always authenticate first with ${COMMANDS.LOGIN}\n` +
          `• Use ${COMMANDS.STATUS} to verify your authentication\n` +
+         `• Use ${COMMANDS.MY_AGENTS} to view your agents\n` +
          `• Use ${COMMANDS.LOGOUT} to securely clear your data\n` +
          `• Your data is encrypted and securely stored\n` +
          `• Contact support if you encounter issues`;

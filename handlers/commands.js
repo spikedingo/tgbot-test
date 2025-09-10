@@ -7,7 +7,7 @@ const { createMainMenuKeyboard } = require('../utils/keyboards');
 const { createLoginKeyboard } = require('../utils/keyboards');
 const { createLogoutKeyboard } = require('../utils/keyboards');
 const { generateLoginUrl } = require('../config/bot');
-const { getUserAccount, generateAgent, createAgent } = require('../api/nation');
+const { getUserAccount, generateAgent, createAgent, getUserAgents } = require('../api/nation');
 const { createAgentCreationKeyboard } = require('../utils/keyboards');
 const { setUserState } = require('../utils/userState');
 
@@ -445,11 +445,131 @@ async function handleCreateAgentCommand(bot, msg) {
   }
 }
 
+/**
+ * Handles the /my_agents command to display user's agents
+ * This command:
+ * 1. Checks if user is authenticated
+ * 2. Calls getUserAgents API to fetch user's agents
+ * 3. Displays the agents in a formatted message
+ * 
+ * @param {Object} bot - Telegram bot instance
+ * @param {Object} msg - Telegram message object
+ */
+async function handleMyAgentsCommand(bot, msg) {
+  const userId = msg.from.id;
+  const userName = msg.from.first_name || 'User';
+  console.log(`Processing /my_agents command for user ${userId}`);
+  
+  try {
+    // Check if user is authenticated
+    const authCheck = checkUserAuthentication(userId);
+    
+    if (!authCheck.isAuthenticated) {
+      const keyboard = createReauthKeyboard(userId);
+      bot.sendMessage(
+        msg.chat.id,
+        '🔐 **Authentication Required**\n\n' +
+        'You need to authenticate first to view your agents.\n\n' +
+        'Please use the login button below to authenticate with Privy.',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: keyboard
+          }
+        }
+      );
+      return;
+    }
+
+    // Show loading message
+    const loadingMessage = await bot.sendMessage(
+      msg.chat.id,
+      '🔄 Loading your agents...'
+    );
+
+    // Get access token directly
+    const accessToken = getUserAccessToken(userId);
+    
+    // Get user's agents
+    const agentsData = await getUserAgents({
+      accessToken: accessToken,
+      limit: 100 // Limit to 100 agents for better readability
+    });
+
+    // Format agents message
+    let message = '🤖 **Your Agents**\n\n';
+    
+    if (!agentsData.data || agentsData.data.length === 0) {
+      message += 'You don\'t have any agents yet.\n\n' +
+                'Use /create_agent to create your first agent!';
+    } else {
+      message += `Found ${agentsData.data.length} agent(s):\n\n`;
+      
+      agentsData.data.forEach((agent, index) => {
+        message += `**${index + 1}. ${agent.name || 'Unnamed Agent'}**\n`;
+        message += `   • ID: \`${agent.id}\`\n`;
+        if (agent.description) {
+          message += `   • Description: ${agent.description}\n`;
+        }
+        if (agent.status) {
+          message += `   • Status: ${agent.status}\n`;
+        }
+        if (agent.created_at) {
+          const createdDate = new Date(agent.created_at).toLocaleDateString();
+          message += `   • Created: ${createdDate}\n`;
+        }
+        message += '\n';
+      });
+      
+      if (agentsData.has_more) {
+        message += '... and more agents available.\n';
+      }
+    }
+
+    // Update the loading message with the results
+    bot.editMessageText(
+      message,
+      {
+        chat_id: msg.chat.id,
+        message_id: loadingMessage.message_id,
+        parse_mode: 'Markdown'
+      }
+    );
+
+  } catch (error) {
+    console.error(`Error processing /my_agents command for user ${userId}:`, error);
+    
+    // Try to edit the loading message if it exists
+    try {
+      await bot.editMessageText(
+        '❌ **Error loading your agents**\n\n' +
+        'There was an error retrieving your agents. Please try again later.\n\n' +
+        'If this error persists, please contact support.',
+        {
+          chat_id: msg.chat.id,
+          message_id: loadingMessage.message_id,
+          parse_mode: 'Markdown'
+        }
+      );
+    } catch (editError) {
+      // If editing fails, send a new message
+      bot.sendMessage(
+        msg.chat.id,
+        '❌ **Error loading your agents**\n\n' +
+        'There was an error retrieving your agents. Please try again later.\n\n' +
+        'If this error persists, please contact support.',
+        { parse_mode: 'Markdown' }
+      );
+    }
+  }
+}
+
 module.exports = {
   handleStartCommand,
   handleLoginCommand,
   handleLogoutCommand,
   handleStatusCommand,
   handleAccessTokenCommand,
-  handleCreateAgentCommand
+  handleCreateAgentCommand,
+  handleMyAgentsCommand
 };

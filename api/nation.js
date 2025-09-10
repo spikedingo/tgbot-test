@@ -1,4 +1,4 @@
-const { Configuration, CreditApi, GeneratorApi, AgentApi } = require('@crestal/nation-sdk');
+const { Configuration, CreditApi, GeneratorApi, AgentApi, UserApi } = require('@crestal/nation-sdk');
 const axios = require('axios');
 
 /**
@@ -112,9 +112,32 @@ const createAgent = async (params) => {
   }
 };
 
+/**
+ * Get user's agents
+ * @param {Object} params - The parameters for the API call
+ * @param {string} params.accessToken - The access token for authentication
+ * @param {string} [params.cursor] - Optional cursor for pagination
+ * @param {number} [params.limit] - Optional limit for number of results
+ * @returns {Promise<Object>} The user's agents data
+ */
+const getUserAgents = async (params) => {
+  try {
+    const configuration = new Configuration({
+      basePath: process.env.NATION_SERVICE_URL,
+      accessToken: params.accessToken
+    });
+    const userApi = new UserApi(configuration);
+    const {data} = await userApi.getUserAgents(params.cursor, params.limit);
+    return data;
+  } catch (err) {
+    throw err;
+  }
+};
+
 module.exports = {
   getCreditExpenseHistory,
   getUserAccount,
   generateAgent,
-  createAgent
+  createAgent,
+  getUserAgents
 };
