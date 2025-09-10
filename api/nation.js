@@ -1,4 +1,5 @@
-const { Configuration, CreditApi } = require('@crestal/nation-sdk');
+const { Configuration, CreditApi, GeneratorApi, AgentApi } = require('@crestal/nation-sdk');
+const axios = require('axios');
 
 /**
  * Parameters for credit expense history
@@ -55,7 +56,65 @@ const getUserAccount = async (accessToken) => {
   }
 };
 
+/**
+ * Generate agent from natural language prompt
+ * @param {Object} params - The parameters for agent generation
+ * @param {string} params.accessToken - The access token for authentication
+ * @param {string} params.prompt - Natural language description of the agent
+ * @param {string} params.userId - User ID for logging and rate limiting
+ * @param {Object|null} params.existingAgent - Optional existing agent to update
+ * @param {string|null} params.projectId - Optional project ID for conversation history
+ * @param {boolean} params.deploy - Whether to deploy the agent after generation
+ * @returns {Promise<Object>} The agent generation response
+ */
+const generateAgent = async (params) => {
+  try {
+    const requestBody = {
+      prompt: params.prompt,
+      user_id: params.userId,
+      existing_agent: params.existingAgent || null,
+      project_id: params.projectId || null,
+      deploy: params.deploy || false
+    };
+    const configuration = new Configuration({
+      basePath: process.env.NATION_SERVICE_URL,
+      accessToken: params.accessToken
+    });
+
+    const generatorApi = new GeneratorApi(configuration);
+
+    const {data} = await generatorApi.generateAgent(requestBody);
+
+    return data;
+  } catch (err) {
+    throw err;
+  }
+};
+
+/**
+ * Create agent using generated configuration
+ * @param {Object} params - The parameters for agent creation
+ * @param {string} params.accessToken - The access token for authentication
+ * @param {Object} params.agent - Agent configuration object
+ * @returns {Promise<Object>} The created agent data
+ */
+const createAgent = async (params) => {
+  try {
+    const configuration = new Configuration({
+      basePath: process.env.NATION_SERVICE_URL,
+      accessToken: params.accessToken
+    });
+    const agentApi = new AgentApi(configuration);
+    const {data} = await agentApi.createAgent(params.agent);
+    return data;
+  } catch (err) {
+    throw err;
+  }
+};
+
 module.exports = {
   getCreditExpenseHistory,
-  getUserAccount
+  getUserAccount,
+  generateAgent,
+  createAgent
 };

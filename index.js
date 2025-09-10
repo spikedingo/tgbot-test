@@ -1,4 +1,4 @@
-require('dotenv').config({ path: '.env.local' });
+require('dotenv').config({ path: '.env' });
 const express = require('express');
 
 // Import bot configuration
@@ -10,11 +10,12 @@ const {
   handleLoginCommand,
   handleStatusCommand,
   handleLogoutCommand,
-  handleAccessTokenCommand
+  handleAccessTokenCommand,
+  handleCreateAgentCommand
 } = require('./handlers/commands');
 
 // Import callback handlers
-const { handleCallbackQuery } = require('./handlers/callbacks');
+const { handleCallbackQuery, processAgentCreation } = require('./handlers/callbacks');
 
 // Import route handlers
 const { 
@@ -33,6 +34,7 @@ const {
 // Import constants
 const { COMMANDS } = require('./config/constants');
 const { updateUserAuthStatus } = require('./mockDb');
+const { getUserState, clearUserState } = require('./utils/userState');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -74,16 +76,24 @@ bot.onText(new RegExp(COMMANDS.LOGIN), (msg) => handleLoginCommand(bot, msg));
 bot.onText(new RegExp(COMMANDS.STATUS), (msg) => handleStatusCommand(bot, msg));
 bot.onText(new RegExp(COMMANDS.LOGOUT), (msg) => handleLogoutCommand(bot, msg));
 bot.onText(new RegExp(COMMANDS.ACCESS_TOKEN), (msg) => handleAccessTokenCommand(bot, msg));
+bot.onText(new RegExp(COMMANDS.CREATE_AGENT), (msg) => handleCreateAgentCommand(bot, msg));
 
 // Setup callback query handler
 bot.on('callback_query', (callbackQuery) => handleCallbackQuery(bot, callbackQuery));
 
-// Handle web app data from Telegram Mini Apps
+// Handle web app data and text messages for agent creation
 bot.on('message', async (msg) => {
+  const userId = msg.from.id;
+  
+  // Skip command messages (they're handled by onText handlers)
+  if (msg.text && msg.text.startsWith('/')) {
+    return;
+  }
+  
   console.log(msg, 'check message')
+  
   // Check if this is web app data
   if (msg.web_app_data) {
-    const userId = msg.from.id;
     console.log(`Received web app data from user ${userId}`);
     
     try {
@@ -109,6 +119,23 @@ bot.on('message', async (msg) => {
         msg.chat.id,
         '❌ There was an error processing your authentication. Please try again.'
       );
+    }
+    return;
+  }
+  
+  // Handle text messages for agent creation
+  if (msg.text && !msg.web_app_data) {
+    const userState = getUserState(userId);
+    
+    // Check if user is in agent creation mode
+    if (userState === 'awaiting_agent_prompt') {
+      console.log(`Processing agent creation prompt from user ${userId}: ${msg.text}`);
+      
+      // Clear the user state since we're processing the prompt
+      clearUserState(userId);
+      
+      // Process the agent creation with the provided prompt
+      await processAgentCreation(bot, msg, msg.text);
     }
   }
 });

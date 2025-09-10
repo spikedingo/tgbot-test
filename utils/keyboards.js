@@ -34,6 +34,12 @@ function createMainMenuKeyboard(authCheck, userId) {
     ]);
     keyboard.push([
       {
+        text: KEYBOARD_BUTTONS.CREATE_AGENT,
+        callback_data: CALLBACK_DATA.CREATE_AGENT
+      }
+    ]);
+    keyboard.push([
+      {
         text: KEYBOARD_BUTTONS.LOGOUT,
         callback_data: CALLBACK_DATA.LOGOUT_USER
       }
@@ -61,6 +67,12 @@ function createAuthenticatedKeyboard(userId) {
       {
         text: KEYBOARD_BUTTONS.CHECK_STATUS,
         callback_data: CALLBACK_DATA.CHECK_STATUS
+      }
+    ],
+    [
+      {
+        text: KEYBOARD_BUTTONS.CREATE_AGENT,
+        callback_data: CALLBACK_DATA.CREATE_AGENT
       }
     ],
     [
@@ -148,10 +160,26 @@ function createLogoutKeyboard(userId) {
   ];
 }
 
+/**
+ * Creates agent creation keyboard with cancel option
+ * @returns {Array} Inline keyboard array
+ */
+function createAgentCreationKeyboard() {
+  return [
+    [
+      {
+        text: KEYBOARD_BUTTONS.CANCEL,
+        callback_data: CALLBACK_DATA.CANCEL_AGENT_CREATION
+      }
+    ]
+  ];
+}
+
 module.exports = {
   createMainMenuKeyboard,
   createAuthenticatedKeyboard,
   createLoginKeyboard,
   createReauthKeyboard,
-  createLogoutKeyboard
+  createLogoutKeyboard,
+  createAgentCreationKeyboard
 };

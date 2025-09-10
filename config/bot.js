@@ -7,8 +7,8 @@ const TelegramBot = require('node-telegram-bot-api');
 
 // Initialize Telegram bot with polling for Railway deployment
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { 
-  polling: false,
-  webHook: true // Enable webhook
+  polling: process.env.USE_POLLING === 'true',
+  webHook: process.env.USE_POLLING !== 'true' // Enable webhook
 });
 
 /**

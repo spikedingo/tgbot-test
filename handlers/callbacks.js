@@ -1,4 +1,4 @@
-const { createReauthKeyboard } = require('../utils/keyboards');
+const { createReauthKeyboard, createAgentCreationKeyboard } = require('../utils/keyboards');
 const { checkUserAuthentication } = require('../utils/auth');
 const { getUserAccessToken, clearUserAuthData, updateUserAuthStatus } = require('../mockDb');
 const { createHelpMessage } = require('../utils/messages');
@@ -6,6 +6,8 @@ const { createWelcomeMessage } = require('../utils/messages');
 const { createMainMenuKeyboard } = require('../utils/keyboards');
 const { generateLoginUrl } = require('../config/bot');
 const { CALLBACK_DATA } = require('../config/constants');
+const { generateAgent, createAgent } = require('../api/nation');
+const { setUserState, clearUserState } = require('../utils/userState');
 
 /**
  * Main callback query handler that routes to specific handlers
@@ -33,6 +35,10 @@ async function handleCallbackQuery(bot, callbackQuery) {
       await handleCheckStatus(bot, callbackQuery);
     } else if (data === CALLBACK_DATA.GET_ACCESS_TOKEN) {
       await handleGetAccessToken(bot, callbackQuery);
+    } else if (data === CALLBACK_DATA.CREATE_AGENT) {
+      await handleCreateAgent(bot, callbackQuery);
+    } else if (data === CALLBACK_DATA.CANCEL_AGENT_CREATION) {
+      await handleCancelAgentCreation(bot, callbackQuery);
     } else if (data && data.startsWith(CALLBACK_DATA.LOGIN_COMPLETE)) {
       // Handle legacy login completion (if still needed)
       await handleLoginComplete(bot, callbackQuery);
@@ -458,6 +464,293 @@ async function handleLoginComplete(bot, callbackQuery) {
   }
 }
 
+/**
+ * Handles create agent request callback
+ * @param {Object} bot - Telegram bot instance
+ * @param {Object} callbackQuery - Telegram callback query object
+ */
+async function handleCreateAgent(bot, callbackQuery) {
+  const userId = callbackQuery.from.id;
+  const userName = callbackQuery.from.first_name || 'User';
+  
+  try {
+    // Answer the callback query
+    await bot.answerCallbackQuery(callbackQuery.id, {
+      text: 'Starting agent creation...',
+      show_alert: false
+    });
+
+    // Check user authentication status
+    const authCheck = checkUserAuthentication(userId);
+
+    if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+      let statusMessage = `🤖 **Create Agent**\n\n`;
+      
+      if (!authCheck.isAuthenticated) {
+        statusMessage += `Authentication: ❌ Not authenticated\n\n`;
+        statusMessage += `Use /login to authenticate with Privy first to create agents.`;
+      } else if (!authCheck.hasValidToken) {
+        statusMessage += `Authentication: ❌ Access token not found or expired\n\n`;
+        statusMessage += `Please re-authenticate using /login to create agents.`;
+        // Clear the invalid authentication data
+        clearUserAuthData(userId);
+      }
+      
+      bot.sendMessage(
+        callbackQuery.message.chat.id,
+        statusMessage,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: createReauthKeyboard(userId)
+          }
+        }
+      );
+      return;
+    }
+
+    // Set user state to await prompt
+    setUserState(userId, 'awaiting_agent_prompt');
+
+    // Send prompt request message
+    bot.sendMessage(
+      callbackQuery.message.chat.id,
+      `🤖 **Create Agent**\n\n` +
+      `${userName}, please describe the agent you want to create.\n\n` +
+      `📝 **Instructions:**\n` +
+      `• Describe what you want your agent to do\n` +
+      `• Include any specific capabilities or tasks\n` +
+      `• Mention scheduling if you want autonomous tasks\n` +
+      `• Minimum 10 characters required\n\n` +
+      `💡 **Examples:**\n` +
+      `• "Buy 0.1 ETH every hour when price drops below $2000"\n` +
+      `• "Monitor my portfolio and send daily reports"\n` +
+      `• "Tweet market updates every 30 minutes"\n\n` +
+      `Please send your agent description as the next message:`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: createAgentCreationKeyboard()
+        }
+      }
+    );
+    
+    console.log(`Sent agent creation prompt to user ${userId} via callback and set awaiting state`);
+    
+  } catch (error) {
+    console.error(`Error handling create agent callback for user ${userId}:`, error);
+    
+    await bot.answerCallbackQuery(callbackQuery.id, {
+      text: '❌ Error starting agent creation. Please try again.',
+      show_alert: true
+    });
+  }
+}
+
+/**
+ * Handles cancel agent creation callback
+ * @param {Object} bot - Telegram bot instance
+ * @param {Object} callbackQuery - Telegram callback query object
+ */
+async function handleCancelAgentCreation(bot, callbackQuery) {
+  const userId = callbackQuery.from.id;
+  
+  try {
+    // Answer the callback query
+    await bot.answerCallbackQuery(callbackQuery.id, {
+      text: 'Agent creation cancelled.',
+      show_alert: false
+    });
+    
+    // Clear user state since they cancelled
+    clearUserState(userId);
+    
+    // Check authentication status to show appropriate menu
+    const authCheck = checkUserAuthentication(userId);
+    const welcomeMessage = createWelcomeMessage('User', authCheck);
+    const keyboard = createMainMenuKeyboard(authCheck, userId);
+    
+    bot.sendMessage(
+      callbackQuery.message.chat.id,
+      `❌ **Agent Creation Cancelled**\n\n` +
+      `No worries! You can create an agent anytime using the button below.\n\n` +
+      welcomeMessage,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: keyboard
+        }
+      }
+    );
+    
+    console.log(`User ${userId} cancelled agent creation and cleared state`);
+    
+  } catch (error) {
+    console.error(`Error handling cancel agent creation for user ${userId}:`, error);
+    
+    await bot.answerCallbackQuery(callbackQuery.id, {
+      text: '❌ Error cancelling. Please try again.',
+      show_alert: true
+    });
+  }
+}
+
+/**
+ * Processes agent creation from prompt text
+ * This function should be called when a user sends a text message after requesting agent creation
+ * @param {Object} bot - Telegram bot instance
+ * @param {Object} msg - Telegram message object
+ * @param {string} prompt - User's agent description prompt
+ */
+async function processAgentCreation(bot, msg, prompt) {
+  const userId = msg.from.id;
+  const userName = msg.from.first_name || 'User';
+  
+  try {
+    // Validate prompt length
+    if (!prompt || prompt.trim().length < 10) {
+      bot.sendMessage(
+        msg.chat.id,
+        `❌ **Prompt Too Short**\n\n` +
+        `Your agent description must be at least 10 characters long.\n\n` +
+        `Current length: ${prompt ? prompt.trim().length : 0} characters\n\n` +
+        `Please provide a more detailed description of what you want your agent to do:`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: createAgentCreationKeyboard()
+          }
+        }
+      );
+      return;
+    }
+
+    // Check authentication
+    const authCheck = checkUserAuthentication(userId);
+    if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+      bot.sendMessage(
+        msg.chat.id,
+        '❌ **Authentication Required**\n\n' +
+        'Please authenticate first using /login to create agents.',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: createReauthKeyboard(userId)
+          }
+        }
+      );
+      return;
+    }
+
+    // Send processing message
+    const processingMsg = await bot.sendMessage(
+      msg.chat.id,
+      `🔄 **Creating Agent**\n\n` +
+      `Processing your request...\n` +
+      `📝 Prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"\n\n` +
+      `⏳ This may take a few moments.`,
+      { parse_mode: 'Markdown' }
+    );
+
+    const accessToken = getUserAccessToken(userId);
+
+    // Generate agent using the Nation API
+    console.log(`Generating agent for user ${userId} with prompt: ${prompt}`);
+    const generateResponse = await generateAgent({
+      accessToken: accessToken,
+      prompt: prompt.trim(),
+      userId: userId,
+      existingAgent: null,
+      projectId: null,
+      deploy: false
+    });
+
+    console.log(`Agent generation successful for user ${userId}:`, {
+      projectId: generateResponse.project_id,
+      agentName: generateResponse.agent?.name,
+      skillsCount: generateResponse.activated_skills?.length || 0,
+      autonomousTasksCount: generateResponse.autonomous_tasks?.length || 0
+    });
+
+    // Create the agent using the generated configuration
+    const createdAgent = await createAgent({
+      accessToken: accessToken,
+      agent: generateResponse.agent
+    });
+
+    console.log(`Agent created successfully for user ${userId}:`, {
+      agentId: createdAgent.id,
+      agentName: createdAgent.name
+    });
+
+    // Update the processing message with success
+    bot.editMessageText(
+      `✅ **Agent Created Successfully!**\n\n` +
+      `🤖 **Agent Name:** ${createdAgent.name}\n` +
+      `📋 **Description:** ${generateResponse.summary || 'Agent created from your prompt'}\n` +
+      `🔧 **Skills Activated:** ${generateResponse.activated_skills?.length || 0}\n` +
+      `⏰ **Autonomous Tasks:** ${generateResponse.autonomous_tasks?.length || 0}\n\n` +
+      `🎉 Your agent is now ready to use!`,
+      {
+        chat_id: msg.chat.id,
+        message_id: processingMsg.message_id,
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🏠 Back to Main Menu',
+                callback_data: CALLBACK_DATA.BACK_TO_START
+              }
+            ]
+          ]
+        }
+      }
+    );
+
+  } catch (error) {
+    console.error(`Error creating agent for user ${userId}:`, error);
+    
+    let errorMessage = 'Failed to create agent';
+    if (error.response?.status === 401) {
+      errorMessage = 'Authentication expired. Please sign in again.';
+      clearUserAuthData(userId);
+    } else if (error.response?.status === 422) {
+      errorMessage = 'Invalid agent configuration. Please try a different description.';
+    } else if (error.response?.data?.message) {
+      errorMessage = `Creation failed: ${error.response.data.message}`;
+    } else if (error.message) {
+      errorMessage = `Creation failed: ${error.message}`;
+    }
+
+    bot.sendMessage(
+      msg.chat.id,
+      `❌ **Agent Creation Failed**\n\n` +
+      `${errorMessage}\n\n` +
+      `Please try again with a different description or contact support if this error persists.`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🔄 Try Again',
+                callback_data: CALLBACK_DATA.CREATE_AGENT
+              }
+            ],
+            [
+              {
+                text: '🏠 Back to Main Menu',
+                callback_data: CALLBACK_DATA.BACK_TO_START
+              }
+            ]
+          ]
+        }
+      }
+    );
+  }
+}
+
 module.exports = {
   handleCallbackQuery,
   handleGetAccessToken,
@@ -466,5 +759,8 @@ module.exports = {
   handleLogoutUser,
   handleReauthRequest,
   handleCheckStatus,
-  handleLoginComplete
+  handleLoginComplete,
+  handleCreateAgent,
+  handleCancelAgentCreation,
+  processAgentCreation
 };

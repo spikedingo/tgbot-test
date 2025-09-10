@@ -7,7 +7,8 @@ const COMMANDS = {
   LOGIN: '/login',
   STATUS: '/status',
   LOGOUT: '/logout',
-  ACCESS_TOKEN: '/accessToken'
+  ACCESS_TOKEN: '/accessToken',
+  CREATE_AGENT: '/create-agent'
 };
 
 const CALLBACK_DATA = {
@@ -17,7 +18,9 @@ const CALLBACK_DATA = {
   BACK_TO_START: 'back_to_start',
   LOGOUT_USER: 'logout_user',
   CHECK_STATUS: 'check_status',
-  GET_ACCESS_TOKEN: 'get_access_token'
+  GET_ACCESS_TOKEN: 'get_access_token',
+  CREATE_AGENT: 'create_agent',
+  CANCEL_AGENT_CREATION: 'cancel_agent_creation'
 };
 
 const MESSAGES = {
@@ -41,7 +44,9 @@ const KEYBOARD_BUTTONS = {
   GET_ACCESS_TOKEN: '🎫 Get Access Token',
   REAUTHENTICATE: '🔄 Re-authenticate',
   MAIN_MENU: '🏠 Main Menu',
-  LOGIN_AGAIN: '🔑 Login Again'
+  LOGIN_AGAIN: '🔑 Login Again',
+  CREATE_AGENT: '🤖 Create Agent',
+  CANCEL: '❌ Cancel'
 };
 
 module.exports = {

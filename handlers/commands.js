@@ -7,7 +7,9 @@ const { createMainMenuKeyboard } = require('../utils/keyboards');
 const { createLoginKeyboard } = require('../utils/keyboards');
 const { createLogoutKeyboard } = require('../utils/keyboards');
 const { generateLoginUrl } = require('../config/bot');
-const { getUserAccount } = require('../api/nation');
+const { getUserAccount, generateAgent, createAgent } = require('../api/nation');
+const { createAgentCreationKeyboard } = require('../utils/keyboards');
+const { setUserState } = require('../utils/userState');
 
 /**
  * Handles the /start command to display a welcome message and menu of available commands
@@ -358,10 +360,96 @@ async function handleAccessTokenCommand(bot, msg) {
   }
 }
 
+/**
+ * Handles the /create-agent command to create agents from natural language prompts
+ * This command:
+ * 1. Checks if user is authenticated
+ * 2. Prompts user to enter an agent description
+ * 3. Validates the prompt (minimum 10 characters)
+ * 4. Calls the agent generation API
+ * 5. Creates the agent and provides feedback
+ * 
+ * @param {Object} bot - Telegram bot instance
+ * @param {Object} msg - Telegram message object
+ */
+async function handleCreateAgentCommand(bot, msg) {
+  const userId = msg.from.id;
+  const userName = msg.from.first_name || 'User';
+  console.log(`Processing /create-agent command for user ${userId}`);
+  
+  try {
+    // Check user authentication status
+    const authCheck = checkUserAuthentication(userId);
+
+    if (!authCheck.isAuthenticated || !authCheck.hasValidToken) {
+      let statusMessage = `🤖 **Create Agent**\n\n`;
+      
+      if (!authCheck.isAuthenticated) {
+        statusMessage += `Authentication: ❌ Not authenticated\n\n`;
+        statusMessage += `Use /login to authenticate with Privy first to create agents.`;
+      } else if (!authCheck.hasValidToken) {
+        statusMessage += `Authentication: ❌ Access token not found or expired\n\n`;
+        statusMessage += `Please re-authenticate using /login to create agents.`;
+        // Clear the invalid authentication data
+        clearUserAuthData(userId);
+      }
+      
+      bot.sendMessage(
+        msg.chat.id,
+        statusMessage,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: createReauthKeyboard(userId)
+          }
+        }
+      );
+      return;
+    }
+
+    // Set user state to await prompt
+    setUserState(userId, 'awaiting_agent_prompt');
+
+    // Send prompt request message
+    bot.sendMessage(
+      msg.chat.id,
+      `🤖 **Create Agent**\n\n` +
+      `${userName}, please describe the agent you want to create.\n\n` +
+      `📝 **Instructions:**\n` +
+      `• Describe what you want your agent to do\n` +
+      `• Include any specific capabilities or tasks\n` +
+      `• Mention scheduling if you want autonomous tasks\n` +
+      `• Minimum 10 characters required\n\n` +
+      `💡 **Examples:**\n` +
+      `• "Buy 0.1 ETH every hour when price drops below $2000"\n` +
+      `• "Monitor my portfolio and send daily reports"\n` +
+      `• "Tweet market updates every 30 minutes"\n\n` +
+      `Please send your agent description as the next message:`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: createAgentCreationKeyboard()
+        }
+      }
+    );
+    
+    console.log(`Sent agent creation prompt to user ${userId} and set awaiting state`);
+    
+  } catch (error) {
+    console.error(`Error processing /create-agent command for user ${userId}:`, error);
+    bot.sendMessage(
+      msg.chat.id,
+      '❌ Sorry, there was an error processing your request. Please try again later.\n\n' +
+      'If this error persists, please contact support.'
+    );
+  }
+}
+
 module.exports = {
   handleStartCommand,
   handleLoginCommand,
   handleLogoutCommand,
   handleStatusCommand,
-  handleAccessTokenCommand
+  handleAccessTokenCommand,
+  handleCreateAgentCommand
 };
