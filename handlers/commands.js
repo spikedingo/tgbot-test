@@ -361,7 +361,7 @@ async function handleAccessTokenCommand(bot, msg) {
 }
 
 /**
- * Handles the /create-agent command to create agents from natural language prompts
+ * Handles the /create_agent command to create agents from natural language prompts
  * This command:
  * 1. Checks if user is authenticated
  * 2. Prompts user to enter an agent description
@@ -375,7 +375,7 @@ async function handleAccessTokenCommand(bot, msg) {
 async function handleCreateAgentCommand(bot, msg) {
   const userId = msg.from.id;
   const userName = msg.from.first_name || 'User';
-  console.log(`Processing /create-agent command for user ${userId}`);
+  console.log(`Processing /create_agent command for user ${userId}`);
   
   try {
     // Check user authentication status
@@ -436,7 +436,7 @@ async function handleCreateAgentCommand(bot, msg) {
     console.log(`Sent agent creation prompt to user ${userId} and set awaiting state`);
     
   } catch (error) {
-    console.error(`Error processing /create-agent command for user ${userId}:`, error);
+    console.error(`Error processing /create_agent command for user ${userId}:`, error);
     bot.sendMessage(
       msg.chat.id,
       '❌ Sorry, there was an error processing your request. Please try again later.\n\n' +
